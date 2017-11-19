@@ -7,7 +7,7 @@ var Size           = require('../utils/Size');
 var Class          = require('uclass');
 var Events         = require('uclass/events');
 var debug          = require('debug');
-var log            = debug("wsavc");
+var log            = console.log;// debug("wsavc");
 
 var WSAvcPlayer = new Class({
   Implements : [Events],
@@ -51,7 +51,7 @@ var WSAvcPlayer = new Class({
         naltype = "PPS";
       }
     }
-    //log("Passed " + naltype + " to decoder");
+    log("Passed " + naltype + " to decoder");
     this.avc.decode(data);
   },
 

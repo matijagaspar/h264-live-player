@@ -243,8 +243,11 @@ var WebGLCanvas = new Class({
   onInitSceneTextures: function () {
     this.texture.bind(0, this.program, "texture");
   },
-
+  
   drawScene: function() {
+    var gl = this.gl;
+    resize(this.gl.canvas);
+    this.gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
   },
 
@@ -256,6 +259,19 @@ var WebGLCanvas = new Class({
 
 });
 
-
+function resize(canvas) {
+  // Lookup the size the browser is displaying the canvas.
+  var displayWidth  = canvas.clientWidth;
+  var displayHeight = canvas.clientHeight;
+ 
+  // Check if the canvas is not the same size.
+  if (canvas.width  != displayWidth ||
+      canvas.height != displayHeight) {
+ 
+    // Make the canvas the same size
+    canvas.width  = displayWidth;
+    canvas.height = displayHeight;
+  }
+}
 
 module.exports = WebGLCanvas;

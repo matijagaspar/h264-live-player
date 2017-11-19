@@ -20,6 +20,8 @@ const server  = http.createServer(app);
 const feed    = new RemoteTCPFeedRelay(server, {
   feed_ip   : "172.19.20.165",
   feed_port : 5001,
+  width : 640,
+  height: 480,
 });
 
 

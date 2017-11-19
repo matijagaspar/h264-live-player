@@ -1,534 +1,4 @@
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.WSAvcPlayer = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-
-/**
- * This is the web browser implementation of `debug()`.
- *
- * Expose `debug()` as the module.
- */
-
-exports = module.exports = require('./debug');
-exports.log = log;
-exports.formatArgs = formatArgs;
-exports.save = save;
-exports.load = load;
-exports.useColors = useColors;
-exports.storage = 'undefined' != typeof chrome
-               && 'undefined' != typeof chrome.storage
-                  ? chrome.storage.local
-                  : localstorage();
-
-/**
- * Colors.
- */
-
-exports.colors = [
-  'lightseagreen',
-  'forestgreen',
-  'goldenrod',
-  'dodgerblue',
-  'darkorchid',
-  'crimson'
-];
-
-/**
- * Currently only WebKit-based Web Inspectors, Firefox >= v31,
- * and the Firebug extension (any Firefox version) are known
- * to support "%c" CSS customizations.
- *
- * TODO: add a `localStorage` variable to explicitly enable/disable colors
- */
-
-function useColors() {
-  // is webkit? http://stackoverflow.com/a/16459606/376773
-  // document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
-  return (typeof document !== 'undefined' && 'WebkitAppearance' in document.documentElement.style) ||
-    // is firebug? http://stackoverflow.com/a/398120/376773
-    (window.console && (console.firebug || (console.exception && console.table))) ||
-    // is firefox >= v31?
-    // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
-    (navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31);
-}
-
-/**
- * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
- */
-
-exports.formatters.j = function(v) {
-  return JSON.stringify(v);
-};
-
-
-/**
- * Colorize log arguments if enabled.
- *
- * @api public
- */
-
-function formatArgs() {
-  var args = arguments;
-  var useColors = this.useColors;
-
-  args[0] = (useColors ? '%c' : '')
-    + this.namespace
-    + (useColors ? ' %c' : ' ')
-    + args[0]
-    + (useColors ? '%c ' : ' ')
-    + '+' + exports.humanize(this.diff);
-
-  if (!useColors) return args;
-
-  var c = 'color: ' + this.color;
-  args = [args[0], c, 'color: inherit'].concat(Array.prototype.slice.call(args, 1));
-
-  // the final "%c" is somewhat tricky, because there could be other
-  // arguments passed either before or after the %c, so we need to
-  // figure out the correct index to insert the CSS into
-  var index = 0;
-  var lastC = 0;
-  args[0].replace(/%[a-z%]/g, function(match) {
-    if ('%%' === match) return;
-    index++;
-    if ('%c' === match) {
-      // we only are interested in the *last* %c
-      // (the user may have provided their own)
-      lastC = index;
-    }
-  });
-
-  args.splice(lastC, 0, c);
-  return args;
-}
-
-/**
- * Invokes `console.log()` when available.
- * No-op when `console.log` is not a "function".
- *
- * @api public
- */
-
-function log() {
-  // this hackery is required for IE8/9, where
-  // the `console.log` function doesn't have 'apply'
-  return 'object' === typeof console
-    && console.log
-    && Function.prototype.apply.call(console.log, console, arguments);
-}
-
-/**
- * Save `namespaces`.
- *
- * @param {String} namespaces
- * @api private
- */
-
-function save(namespaces) {
-  try {
-    if (null == namespaces) {
-      exports.storage.removeItem('debug');
-    } else {
-      exports.storage.debug = namespaces;
-    }
-  } catch(e) {}
-}
-
-/**
- * Load `namespaces`.
- *
- * @return {String} returns the previously persisted debug modes
- * @api private
- */
-
-function load() {
-  var r;
-  try {
-    r = exports.storage.debug;
-  } catch(e) {}
-
-  // If debug isn't set in LS, and we're in Electron, try to load $DEBUG
-  if ('env' in (typeof process === 'undefined' ? {} : process)) {
-    r = process.env.DEBUG;
-  }
-  
-  return r;
-}
-
-/**
- * Enable namespaces listed in `localStorage.debug` initially.
- */
-
-exports.enable(load());
-
-/**
- * Localstorage attempts to return the localstorage.
- *
- * This is necessary because safari throws
- * when a user disables cookies/localstorage
- * and you attempt to access it.
- *
- * @return {LocalStorage}
- * @api private
- */
-
-function localstorage(){
-  try {
-    return window.localStorage;
-  } catch (e) {}
-}
-
-},{"./debug":2}],2:[function(require,module,exports){
-
-/**
- * This is the common logic for both the Node.js and web browser
- * implementations of `debug()`.
- *
- * Expose `debug()` as the module.
- */
-
-exports = module.exports = debug.debug = debug;
-exports.coerce = coerce;
-exports.disable = disable;
-exports.enable = enable;
-exports.enabled = enabled;
-exports.humanize = require('ms');
-
-/**
- * The currently active debug mode names, and names to skip.
- */
-
-exports.names = [];
-exports.skips = [];
-
-/**
- * Map of special "%n" handling functions, for the debug "format" argument.
- *
- * Valid key names are a single, lowercased letter, i.e. "n".
- */
-
-exports.formatters = {};
-
-/**
- * Previously assigned color.
- */
-
-var prevColor = 0;
-
-/**
- * Previous log timestamp.
- */
-
-var prevTime;
-
-/**
- * Select a color.
- *
- * @return {Number}
- * @api private
- */
-
-function selectColor() {
-  return exports.colors[prevColor++ % exports.colors.length];
-}
-
-/**
- * Create a debugger with the given `namespace`.
- *
- * @param {String} namespace
- * @return {Function}
- * @api public
- */
-
-function debug(namespace) {
-
-  // define the `disabled` version
-  function disabled() {
-  }
-  disabled.enabled = false;
-
-  // define the `enabled` version
-  function enabled() {
-
-    var self = enabled;
-
-    // set `diff` timestamp
-    var curr = +new Date();
-    var ms = curr - (prevTime || curr);
-    self.diff = ms;
-    self.prev = prevTime;
-    self.curr = curr;
-    prevTime = curr;
-
-    // add the `color` if not set
-    if (null == self.useColors) self.useColors = exports.useColors();
-    if (null == self.color && self.useColors) self.color = selectColor();
-
-    var args = new Array(arguments.length);
-    for (var i = 0; i < args.length; i++) {
-      args[i] = arguments[i];
-    }
-
-    args[0] = exports.coerce(args[0]);
-
-    if ('string' !== typeof args[0]) {
-      // anything else let's inspect with %o
-      args = ['%o'].concat(args);
-    }
-
-    // apply any `formatters` transformations
-    var index = 0;
-    args[0] = args[0].replace(/%([a-z%])/g, function(match, format) {
-      // if we encounter an escaped % then don't increase the array index
-      if (match === '%%') return match;
-      index++;
-      var formatter = exports.formatters[format];
-      if ('function' === typeof formatter) {
-        var val = args[index];
-        match = formatter.call(self, val);
-
-        // now we need to remove `args[index]` since it's inlined in the `format`
-        args.splice(index, 1);
-        index--;
-      }
-      return match;
-    });
-
-    // apply env-specific formatting
-    args = exports.formatArgs.apply(self, args);
-
-    var logFn = enabled.log || exports.log || console.log.bind(console);
-    logFn.apply(self, args);
-  }
-  enabled.enabled = true;
-
-  var fn = exports.enabled(namespace) ? enabled : disabled;
-
-  fn.namespace = namespace;
-
-  return fn;
-}
-
-/**
- * Enables a debug mode by namespaces. This can include modes
- * separated by a colon and wildcards.
- *
- * @param {String} namespaces
- * @api public
- */
-
-function enable(namespaces) {
-  exports.save(namespaces);
-
-  var split = (namespaces || '').split(/[\s,]+/);
-  var len = split.length;
-
-  for (var i = 0; i < len; i++) {
-    if (!split[i]) continue; // ignore empty strings
-    namespaces = split[i].replace(/[\\^$+?.()|[\]{}]/g, '\\$&').replace(/\*/g, '.*?');
-    if (namespaces[0] === '-') {
-      exports.skips.push(new RegExp('^' + namespaces.substr(1) + '$'));
-    } else {
-      exports.names.push(new RegExp('^' + namespaces + '$'));
-    }
-  }
-}
-
-/**
- * Disable debug output.
- *
- * @api public
- */
-
-function disable() {
-  exports.enable('');
-}
-
-/**
- * Returns true if the given mode name is enabled, false otherwise.
- *
- * @param {String} name
- * @return {Boolean}
- * @api public
- */
-
-function enabled(name) {
-  var i, len;
-  for (i = 0, len = exports.skips.length; i < len; i++) {
-    if (exports.skips[i].test(name)) {
-      return false;
-    }
-  }
-  for (i = 0, len = exports.names.length; i < len; i++) {
-    if (exports.names[i].test(name)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Coerce `val`.
- *
- * @param {Mixed} val
- * @return {Mixed}
- * @api private
- */
-
-function coerce(val) {
-  if (val instanceof Error) return val.stack || val.message;
-  return val;
-}
-
-},{"ms":3}],3:[function(require,module,exports){
-/**
- * Helpers.
- */
-
-var s = 1000
-var m = s * 60
-var h = m * 60
-var d = h * 24
-var y = d * 365.25
-
-/**
- * Parse or format the given `val`.
- *
- * Options:
- *
- *  - `long` verbose formatting [false]
- *
- * @param {String|Number} val
- * @param {Object} options
- * @throws {Error} throw an error if val is not a non-empty string or a number
- * @return {String|Number}
- * @api public
- */
-
-module.exports = function (val, options) {
-  options = options || {}
-  var type = typeof val
-  if (type === 'string' && val.length > 0) {
-    return parse(val)
-  } else if (type === 'number' && isNaN(val) === false) {
-    return options.long ?
-			fmtLong(val) :
-			fmtShort(val)
-  }
-  throw new Error('val is not a non-empty string or a valid number. val=' + JSON.stringify(val))
-}
-
-/**
- * Parse the given `str` and return milliseconds.
- *
- * @param {String} str
- * @return {Number}
- * @api private
- */
-
-function parse(str) {
-  str = String(str)
-  if (str.length > 10000) {
-    return
-  }
-  var match = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(str)
-  if (!match) {
-    return
-  }
-  var n = parseFloat(match[1])
-  var type = (match[2] || 'ms').toLowerCase()
-  switch (type) {
-    case 'years':
-    case 'year':
-    case 'yrs':
-    case 'yr':
-    case 'y':
-      return n * y
-    case 'days':
-    case 'day':
-    case 'd':
-      return n * d
-    case 'hours':
-    case 'hour':
-    case 'hrs':
-    case 'hr':
-    case 'h':
-      return n * h
-    case 'minutes':
-    case 'minute':
-    case 'mins':
-    case 'min':
-    case 'm':
-      return n * m
-    case 'seconds':
-    case 'second':
-    case 'secs':
-    case 'sec':
-    case 's':
-      return n * s
-    case 'milliseconds':
-    case 'millisecond':
-    case 'msecs':
-    case 'msec':
-    case 'ms':
-      return n
-    default:
-      return undefined
-  }
-}
-
-/**
- * Short format for `ms`.
- *
- * @param {Number} ms
- * @return {String}
- * @api private
- */
-
-function fmtShort(ms) {
-  if (ms >= d) {
-    return Math.round(ms / d) + 'd'
-  }
-  if (ms >= h) {
-    return Math.round(ms / h) + 'h'
-  }
-  if (ms >= m) {
-    return Math.round(ms / m) + 'm'
-  }
-  if (ms >= s) {
-    return Math.round(ms / s) + 's'
-  }
-  return ms + 'ms'
-}
-
-/**
- * Long format for `ms`.
- *
- * @param {Number} ms
- * @return {String}
- * @api private
- */
-
-function fmtLong(ms) {
-  return plural(ms, d, 'day') ||
-    plural(ms, h, 'hour') ||
-    plural(ms, m, 'minute') ||
-    plural(ms, s, 'second') ||
-    ms + ' ms'
-}
-
-/**
- * Pluralization helper.
- */
-
-function plural(ms, n, name) {
-  if (ms < n) {
-    return
-  }
-  if (ms < n * 1.5) {
-    return Math.floor(ms / n) + ' ' + name
-  }
-  return Math.ceil(ms / n) + ' ' + name + 's'
-}
-
-},{}],4:[function(require,module,exports){
 (function (__dirname){
 // universal module definition
 (function (root, factory) {
@@ -1497,8 +967,8 @@ function A(a){a&&(p.print(a),p.fa(a));H=i;d("abort() at "+Fa()+"\nIf this abort(
 }));
 
 
-}).call(this,"/dvp\\node_modules\\h264-live-player\\vendor\\broadway")
-},{}],5:[function(require,module,exports){
+}).call(this,"/dev\\h264-live-player\\vendor\\broadway")
+},{}],2:[function(require,module,exports){
 "use strict";
 var assert = require('../utils/assert');
 
@@ -1532,7 +1002,7 @@ Program.prototype = {
 module.exports = Program;
 
 
-},{"../utils/assert":20}],6:[function(require,module,exports){
+},{"../utils/assert":44}],3:[function(require,module,exports){
 "use strict";
 
 var assert = require('../utils/assert');
@@ -1574,7 +1044,7 @@ Script.createFromSource = function(type, source) {
 
 
 module.exports = Script;
-},{"../utils/assert":20}],7:[function(require,module,exports){
+},{"../utils/assert":44}],4:[function(require,module,exports){
 "use strict";
 
 var error = require('../utils/error');
@@ -1614,7 +1084,7 @@ module.exports = Shader;
 
 
 
-},{"../utils/error":21}],8:[function(require,module,exports){
+},{"../utils/error":45}],5:[function(require,module,exports){
 "use strict";
 
 var assert = require('../utils/assert');
@@ -1663,7 +1133,7 @@ Texture.prototype = {
 module.exports = Texture;
 
 
-},{"../utils/assert":20}],9:[function(require,module,exports){
+},{"../utils/assert":44}],6:[function(require,module,exports){
 "use strict";
 
 /**
@@ -1909,8 +1379,11 @@ var WebGLCanvas = new Class({
   onInitSceneTextures: function () {
     this.texture.bind(0, this.program, "texture");
   },
-
+  
   drawScene: function() {
+    var gl = this.gl;
+    resize(this.gl.canvas);
+    this.gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     this.gl.drawArrays(this.gl.TRIANGLE_STRIP, 0, 4);
   },
 
@@ -1922,11 +1395,24 @@ var WebGLCanvas = new Class({
 
 });
 
-
+function resize(canvas) {
+  // Lookup the size the browser is displaying the canvas.
+  var displayWidth  = canvas.clientWidth;
+  var displayHeight = canvas.clientHeight;
+ 
+  // Check if the canvas is not the same size.
+  if (canvas.width  != displayWidth ||
+      canvas.height != displayHeight) {
+ 
+    // Make the canvas the same size
+    canvas.width  = displayWidth;
+    canvas.height = displayHeight;
+  }
+}
 
 module.exports = WebGLCanvas;
 
-},{"../utils/error":21,"../utils/glUtils":22,"./Script":6,"sylvester.js":12,"uclass":47}],10:[function(require,module,exports){
+},{"../utils/error":45,"../utils/glUtils":46,"./Script":3,"sylvester.js":33,"uclass":42}],7:[function(require,module,exports){
 "use strict";
 var Class = require('uclass');
 
@@ -1978,7 +1464,7 @@ var YUVCanvas = new Class({
 
 
 module.exports = YUVCanvas;
-},{"uclass":47}],11:[function(require,module,exports){
+},{"uclass":42}],8:[function(require,module,exports){
 "use strict";
 
 var Program     = require('./Program');
@@ -2088,7 +1574,1052 @@ var YUVWebGLCanvas = new Class({
 
 module.exports = YUVWebGLCanvas;
 
-},{"./Program":5,"./Script":6,"./Shader":7,"./Texture":8,"./WebGLCanvas":9,"uclass":47}],12:[function(require,module,exports){
+},{"./Program":2,"./Script":3,"./Shader":4,"./Texture":5,"./WebGLCanvas":6,"uclass":42}],9:[function(require,module,exports){
+/**
+ * This is the web browser implementation of `debug()`.
+ *
+ * Expose `debug()` as the module.
+ */
+
+exports = module.exports = require('./debug');
+exports.log = log;
+exports.formatArgs = formatArgs;
+exports.save = save;
+exports.load = load;
+exports.useColors = useColors;
+exports.storage = 'undefined' != typeof chrome
+               && 'undefined' != typeof chrome.storage
+                  ? chrome.storage.local
+                  : localstorage();
+
+/**
+ * Colors.
+ */
+
+exports.colors = [
+  'lightseagreen',
+  'forestgreen',
+  'goldenrod',
+  'dodgerblue',
+  'darkorchid',
+  'crimson'
+];
+
+/**
+ * Currently only WebKit-based Web Inspectors, Firefox >= v31,
+ * and the Firebug extension (any Firefox version) are known
+ * to support "%c" CSS customizations.
+ *
+ * TODO: add a `localStorage` variable to explicitly enable/disable colors
+ */
+
+function useColors() {
+  // NB: In an Electron preload script, document will be defined but not fully
+  // initialized. Since we know we're in Chrome, we'll just detect this case
+  // explicitly
+  if (typeof window !== 'undefined' && window.process && window.process.type === 'renderer') {
+    return true;
+  }
+
+  // is webkit? http://stackoverflow.com/a/16459606/376773
+  // document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
+  return (typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance) ||
+    // is firebug? http://stackoverflow.com/a/398120/376773
+    (typeof window !== 'undefined' && window.console && (window.console.firebug || (window.console.exception && window.console.table))) ||
+    // is firefox >= v31?
+    // https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
+    (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31) ||
+    // double check webkit in userAgent just in case we are in a worker
+    (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/));
+}
+
+/**
+ * Map %j to `JSON.stringify()`, since no Web Inspectors do that by default.
+ */
+
+exports.formatters.j = function(v) {
+  try {
+    return JSON.stringify(v);
+  } catch (err) {
+    return '[UnexpectedJSONParseError]: ' + err.message;
+  }
+};
+
+
+/**
+ * Colorize log arguments if enabled.
+ *
+ * @api public
+ */
+
+function formatArgs(args) {
+  var useColors = this.useColors;
+
+  args[0] = (useColors ? '%c' : '')
+    + this.namespace
+    + (useColors ? ' %c' : ' ')
+    + args[0]
+    + (useColors ? '%c ' : ' ')
+    + '+' + exports.humanize(this.diff);
+
+  if (!useColors) return;
+
+  var c = 'color: ' + this.color;
+  args.splice(1, 0, c, 'color: inherit')
+
+  // the final "%c" is somewhat tricky, because there could be other
+  // arguments passed either before or after the %c, so we need to
+  // figure out the correct index to insert the CSS into
+  var index = 0;
+  var lastC = 0;
+  args[0].replace(/%[a-zA-Z%]/g, function(match) {
+    if ('%%' === match) return;
+    index++;
+    if ('%c' === match) {
+      // we only are interested in the *last* %c
+      // (the user may have provided their own)
+      lastC = index;
+    }
+  });
+
+  args.splice(lastC, 0, c);
+}
+
+/**
+ * Invokes `console.log()` when available.
+ * No-op when `console.log` is not a "function".
+ *
+ * @api public
+ */
+
+function log() {
+  // this hackery is required for IE8/9, where
+  // the `console.log` function doesn't have 'apply'
+  return 'object' === typeof console
+    && console.log
+    && Function.prototype.apply.call(console.log, console, arguments);
+}
+
+/**
+ * Save `namespaces`.
+ *
+ * @param {String} namespaces
+ * @api private
+ */
+
+function save(namespaces) {
+  try {
+    if (null == namespaces) {
+      exports.storage.removeItem('debug');
+    } else {
+      exports.storage.debug = namespaces;
+    }
+  } catch(e) {}
+}
+
+/**
+ * Load `namespaces`.
+ *
+ * @return {String} returns the previously persisted debug modes
+ * @api private
+ */
+
+function load() {
+  var r;
+  try {
+    r = exports.storage.debug;
+  } catch(e) {}
+
+  // If debug isn't set in LS, and we're in Electron, try to load $DEBUG
+  if (!r && typeof process !== 'undefined' && 'env' in process) {
+    r = process.env.DEBUG;
+  }
+
+  return r;
+}
+
+/**
+ * Enable namespaces listed in `localStorage.debug` initially.
+ */
+
+exports.enable(load());
+
+/**
+ * Localstorage attempts to return the localstorage.
+ *
+ * This is necessary because safari throws
+ * when a user disables cookies/localstorage
+ * and you attempt to access it.
+ *
+ * @return {LocalStorage}
+ * @api private
+ */
+
+function localstorage() {
+  try {
+    return window.localStorage;
+  } catch (e) {}
+}
+
+},{"./debug":10}],10:[function(require,module,exports){
+
+/**
+ * This is the common logic for both the Node.js and web browser
+ * implementations of `debug()`.
+ *
+ * Expose `debug()` as the module.
+ */
+
+exports = module.exports = createDebug.debug = createDebug['default'] = createDebug;
+exports.coerce = coerce;
+exports.disable = disable;
+exports.enable = enable;
+exports.enabled = enabled;
+exports.humanize = require('ms');
+
+/**
+ * The currently active debug mode names, and names to skip.
+ */
+
+exports.names = [];
+exports.skips = [];
+
+/**
+ * Map of special "%n" handling functions, for the debug "format" argument.
+ *
+ * Valid key names are a single, lower or upper-case letter, i.e. "n" and "N".
+ */
+
+exports.formatters = {};
+
+/**
+ * Previous log timestamp.
+ */
+
+var prevTime;
+
+/**
+ * Select a color.
+ * @param {String} namespace
+ * @return {Number}
+ * @api private
+ */
+
+function selectColor(namespace) {
+  var hash = 0, i;
+
+  for (i in namespace) {
+    hash  = ((hash << 5) - hash) + namespace.charCodeAt(i);
+    hash |= 0; // Convert to 32bit integer
+  }
+
+  return exports.colors[Math.abs(hash) % exports.colors.length];
+}
+
+/**
+ * Create a debugger with the given `namespace`.
+ *
+ * @param {String} namespace
+ * @return {Function}
+ * @api public
+ */
+
+function createDebug(namespace) {
+
+  function debug() {
+    // disabled?
+    if (!debug.enabled) return;
+
+    var self = debug;
+
+    // set `diff` timestamp
+    var curr = +new Date();
+    var ms = curr - (prevTime || curr);
+    self.diff = ms;
+    self.prev = prevTime;
+    self.curr = curr;
+    prevTime = curr;
+
+    // turn the `arguments` into a proper Array
+    var args = new Array(arguments.length);
+    for (var i = 0; i < args.length; i++) {
+      args[i] = arguments[i];
+    }
+
+    args[0] = exports.coerce(args[0]);
+
+    if ('string' !== typeof args[0]) {
+      // anything else let's inspect with %O
+      args.unshift('%O');
+    }
+
+    // apply any `formatters` transformations
+    var index = 0;
+    args[0] = args[0].replace(/%([a-zA-Z%])/g, function(match, format) {
+      // if we encounter an escaped % then don't increase the array index
+      if (match === '%%') return match;
+      index++;
+      var formatter = exports.formatters[format];
+      if ('function' === typeof formatter) {
+        var val = args[index];
+        match = formatter.call(self, val);
+
+        // now we need to remove `args[index]` since it's inlined in the `format`
+        args.splice(index, 1);
+        index--;
+      }
+      return match;
+    });
+
+    // apply env-specific formatting (colors, etc.)
+    exports.formatArgs.call(self, args);
+
+    var logFn = debug.log || exports.log || console.log.bind(console);
+    logFn.apply(self, args);
+  }
+
+  debug.namespace = namespace;
+  debug.enabled = exports.enabled(namespace);
+  debug.useColors = exports.useColors();
+  debug.color = selectColor(namespace);
+
+  // env-specific initialization logic for debug instances
+  if ('function' === typeof exports.init) {
+    exports.init(debug);
+  }
+
+  return debug;
+}
+
+/**
+ * Enables a debug mode by namespaces. This can include modes
+ * separated by a colon and wildcards.
+ *
+ * @param {String} namespaces
+ * @api public
+ */
+
+function enable(namespaces) {
+  exports.save(namespaces);
+
+  exports.names = [];
+  exports.skips = [];
+
+  var split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
+  var len = split.length;
+
+  for (var i = 0; i < len; i++) {
+    if (!split[i]) continue; // ignore empty strings
+    namespaces = split[i].replace(/\*/g, '.*?');
+    if (namespaces[0] === '-') {
+      exports.skips.push(new RegExp('^' + namespaces.substr(1) + '$'));
+    } else {
+      exports.names.push(new RegExp('^' + namespaces + '$'));
+    }
+  }
+}
+
+/**
+ * Disable debug output.
+ *
+ * @api public
+ */
+
+function disable() {
+  exports.enable('');
+}
+
+/**
+ * Returns true if the given mode name is enabled, false otherwise.
+ *
+ * @param {String} name
+ * @return {Boolean}
+ * @api public
+ */
+
+function enabled(name) {
+  var i, len;
+  for (i = 0, len = exports.skips.length; i < len; i++) {
+    if (exports.skips[i].test(name)) {
+      return false;
+    }
+  }
+  for (i = 0, len = exports.names.length; i < len; i++) {
+    if (exports.names[i].test(name)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Coerce `val`.
+ *
+ * @param {Mixed} val
+ * @return {Mixed}
+ * @api private
+ */
+
+function coerce(val) {
+  if (val instanceof Error) return val.stack || val.message;
+  return val;
+}
+
+},{"ms":32}],11:[function(require,module,exports){
+var kindOf = require('./kindOf');
+var isPlainObject = require('./isPlainObject');
+var mixIn = require('../object/mixIn');
+
+    /**
+     * Clone native types.
+     */
+    function clone(val){
+        switch (kindOf(val)) {
+            case 'Object':
+                return cloneObject(val);
+            case 'Array':
+                return cloneArray(val);
+            case 'RegExp':
+                return cloneRegExp(val);
+            case 'Date':
+                return cloneDate(val);
+            default:
+                return val;
+        }
+    }
+
+    function cloneObject(source) {
+        if (isPlainObject(source)) {
+            return mixIn({}, source);
+        } else {
+            return source;
+        }
+    }
+
+    function cloneRegExp(r) {
+        var flags = '';
+        flags += r.multiline ? 'm' : '';
+        flags += r.global ? 'g' : '';
+        flags += r.ignoreCase ? 'i' : '';
+        return new RegExp(r.source, flags);
+    }
+
+    function cloneDate(date) {
+        return new Date(+date);
+    }
+
+    function cloneArray(arr) {
+        return arr.slice();
+    }
+
+    module.exports = clone;
+
+
+
+},{"../object/mixIn":25,"./isPlainObject":17,"./kindOf":18}],12:[function(require,module,exports){
+var mixIn = require('../object/mixIn');
+
+    /**
+     * Create Object using prototypal inheritance and setting custom properties.
+     * - Mix between Douglas Crockford Prototypal Inheritance <http://javascript.crockford.com/prototypal.html> and the EcmaScript 5 `Object.create()` method.
+     * @param {object} parent    Parent Object.
+     * @param {object} [props] Object properties.
+     * @return {object} Created object.
+     */
+    function createObject(parent, props){
+        function F(){}
+        F.prototype = parent;
+        return mixIn(new F(), props);
+
+    }
+    module.exports = createObject;
+
+
+
+},{"../object/mixIn":25}],13:[function(require,module,exports){
+var clone = require('./clone');
+var forOwn = require('../object/forOwn');
+var kindOf = require('./kindOf');
+var isPlainObject = require('./isPlainObject');
+
+    /**
+     * Recursively clone native types.
+     */
+    function deepClone(val, instanceClone) {
+        switch ( kindOf(val) ) {
+            case 'Object':
+                return cloneObject(val, instanceClone);
+            case 'Array':
+                return cloneArray(val, instanceClone);
+            default:
+                return clone(val);
+        }
+    }
+
+    function cloneObject(source, instanceClone) {
+        if (isPlainObject(source)) {
+            var out = {};
+            forOwn(source, function(val, key) {
+                this[key] = deepClone(val, instanceClone);
+            }, out);
+            return out;
+        } else if (instanceClone) {
+            return instanceClone(source);
+        } else {
+            return source;
+        }
+    }
+
+    function cloneArray(arr, instanceClone) {
+        var out = [],
+            i = -1,
+            n = arr.length,
+            val;
+        while (++i < n) {
+            out[i] = deepClone(arr[i], instanceClone);
+        }
+        return out;
+    }
+
+    module.exports = deepClone;
+
+
+
+
+},{"../object/forOwn":22,"./clone":11,"./isPlainObject":17,"./kindOf":18}],14:[function(require,module,exports){
+var isKind = require('./isKind');
+    /**
+     */
+    var isArray = Array.isArray || function (val) {
+        return isKind(val, 'Array');
+    };
+    module.exports = isArray;
+
+
+},{"./isKind":15}],15:[function(require,module,exports){
+var kindOf = require('./kindOf');
+    /**
+     * Check if value is from a specific "kind".
+     */
+    function isKind(val, kind){
+        return kindOf(val) === kind;
+    }
+    module.exports = isKind;
+
+
+},{"./kindOf":18}],16:[function(require,module,exports){
+var isKind = require('./isKind');
+    /**
+     */
+    function isObject(val) {
+        return isKind(val, 'Object');
+    }
+    module.exports = isObject;
+
+
+},{"./isKind":15}],17:[function(require,module,exports){
+
+
+    /**
+     * Checks if the value is created by the `Object` constructor.
+     */
+    function isPlainObject(value) {
+        return (!!value && typeof value === 'object' &&
+            value.constructor === Object);
+    }
+
+    module.exports = isPlainObject;
+
+
+
+},{}],18:[function(require,module,exports){
+
+    /**
+     * Gets the "kind" of value. (e.g. "String", "Number", etc)
+     */
+    function kindOf(val) {
+        return Object.prototype.toString.call(val).slice(8, -1);
+    }
+    module.exports = kindOf;
+
+
+},{}],19:[function(require,module,exports){
+/**
+ * @constant Maximum 32-bit signed integer value. (2^31 - 1)
+ */
+
+    module.exports = 2147483647;
+
+
+},{}],20:[function(require,module,exports){
+/**
+ * @constant Minimum 32-bit signed integer value (-2^31).
+ */
+
+    module.exports = -2147483648;
+
+
+},{}],21:[function(require,module,exports){
+var hasOwn = require('./hasOwn');
+
+    var _hasDontEnumBug,
+        _dontEnums;
+
+    function checkDontEnum(){
+        _dontEnums = [
+                'toString',
+                'toLocaleString',
+                'valueOf',
+                'hasOwnProperty',
+                'isPrototypeOf',
+                'propertyIsEnumerable',
+                'constructor'
+            ];
+
+        _hasDontEnumBug = true;
+
+        for (var key in {'toString': null}) {
+            _hasDontEnumBug = false;
+        }
+    }
+
+    /**
+     * Similar to Array/forEach but works over object properties and fixes Don't
+     * Enum bug on IE.
+     * based on: http://whattheheadsaid.com/2010/10/a-safer-object-keys-compatibility-implementation
+     */
+    function forIn(obj, fn, thisObj){
+        var key, i = 0;
+        // no need to check if argument is a real object that way we can use
+        // it for arrays, functions, date, etc.
+
+        //post-pone check till needed
+        if (_hasDontEnumBug == null) checkDontEnum();
+
+        for (key in obj) {
+            if (exec(fn, obj, key, thisObj) === false) {
+                break;
+            }
+        }
+
+
+        if (_hasDontEnumBug) {
+            var ctor = obj.constructor,
+                isProto = !!ctor && obj === ctor.prototype;
+
+            while (key = _dontEnums[i++]) {
+                // For constructor, if it is a prototype object the constructor
+                // is always non-enumerable unless defined otherwise (and
+                // enumerated above).  For non-prototype objects, it will have
+                // to be defined on this object, since it cannot be defined on
+                // any prototype objects.
+                //
+                // For other [[DontEnum]] properties, check if the value is
+                // different than Object prototype value.
+                if (
+                    (key !== 'constructor' ||
+                        (!isProto && hasOwn(obj, key))) &&
+                    obj[key] !== Object.prototype[key]
+                ) {
+                    if (exec(fn, obj, key, thisObj) === false) {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    function exec(fn, obj, key, thisObj){
+        return fn.call(thisObj, obj[key], key, obj);
+    }
+
+    module.exports = forIn;
+
+
+
+},{"./hasOwn":23}],22:[function(require,module,exports){
+var hasOwn = require('./hasOwn');
+var forIn = require('./forIn');
+
+    /**
+     * Similar to Array/forEach but works over object properties and fixes Don't
+     * Enum bug on IE.
+     * based on: http://whattheheadsaid.com/2010/10/a-safer-object-keys-compatibility-implementation
+     */
+    function forOwn(obj, fn, thisObj){
+        forIn(obj, function(val, key){
+            if (hasOwn(obj, key)) {
+                return fn.call(thisObj, obj[key], key, obj);
+            }
+        });
+    }
+
+    module.exports = forOwn;
+
+
+
+},{"./forIn":21,"./hasOwn":23}],23:[function(require,module,exports){
+
+
+    /**
+     * Safer Object.hasOwnProperty
+     */
+     function hasOwn(obj, prop){
+         return Object.prototype.hasOwnProperty.call(obj, prop);
+     }
+
+     module.exports = hasOwn;
+
+
+
+},{}],24:[function(require,module,exports){
+var hasOwn = require('./hasOwn');
+var deepClone = require('../lang/deepClone');
+var isObject = require('../lang/isObject');
+
+    /**
+     * Deep merge objects.
+     */
+    function merge() {
+        var i = 1,
+            key, val, obj, target;
+
+        // make sure we don't modify source element and it's properties
+        // objects are passed by reference
+        target = deepClone( arguments[0] );
+
+        while (obj = arguments[i++]) {
+            for (key in obj) {
+                if ( ! hasOwn(obj, key) ) {
+                    continue;
+                }
+
+                val = obj[key];
+
+                if ( isObject(val) && isObject(target[key]) ){
+                    // inception, deep merge objects
+                    target[key] = merge(target[key], val);
+                } else {
+                    // make sure arrays, regexp, date, objects are cloned
+                    target[key] = deepClone(val);
+                }
+
+            }
+        }
+
+        return target;
+    }
+
+    module.exports = merge;
+
+
+
+},{"../lang/deepClone":13,"../lang/isObject":16,"./hasOwn":23}],25:[function(require,module,exports){
+var forOwn = require('./forOwn');
+
+    /**
+    * Combine properties from all the objects into first one.
+    * - This method affects target object in place, if you want to create a new Object pass an empty object as first param.
+    * @param {object} target    Target Object
+    * @param {...object} objects    Objects to be combined (0...n objects).
+    * @return {object} Target Object.
+    */
+    function mixIn(target, objects){
+        var i = 0,
+            n = arguments.length,
+            obj;
+        while(++i < n){
+            obj = arguments[i];
+            if (obj != null) {
+                forOwn(obj, copyProp, target);
+            }
+        }
+        return target;
+    }
+
+    function copyProp(val, key){
+        this[key] = val;
+    }
+
+    module.exports = mixIn;
+
+
+},{"./forOwn":22}],26:[function(require,module,exports){
+var randInt = require('./randInt');
+var isArray = require('../lang/isArray');
+
+    /**
+     * Returns a random element from the supplied arguments
+     * or from the array (if single argument is an array).
+     */
+    function choice(items) {
+        var target = (arguments.length === 1 && isArray(items))? items : arguments;
+        return target[ randInt(0, target.length - 1) ];
+    }
+
+    module.exports = choice;
+
+
+
+},{"../lang/isArray":14,"./randInt":30}],27:[function(require,module,exports){
+var randHex = require('./randHex');
+var choice = require('./choice');
+
+  /**
+   * Returns pseudo-random guid (UUID v4)
+   * IMPORTANT: it's not totally "safe" since randHex/choice uses Math.random
+   * by default and sequences can be predicted in some cases. See the
+   * "random/random" documentation for more info about it and how to replace
+   * the default PRNG.
+   */
+  function guid() {
+    return (
+        randHex(8)+'-'+
+        randHex(4)+'-'+
+        // v4 UUID always contain "4" at this position to specify it was
+        // randomly generated
+        '4' + randHex(3) +'-'+
+        // v4 UUID always contain chars [a,b,8,9] at this position
+        choice(8, 9, 'a', 'b') + randHex(3)+'-'+
+        randHex(12)
+    );
+  }
+  module.exports = guid;
+
+
+},{"./choice":26,"./randHex":29}],28:[function(require,module,exports){
+var random = require('./random');
+var MIN_INT = require('../number/MIN_INT');
+var MAX_INT = require('../number/MAX_INT');
+
+    /**
+     * Returns random number inside range
+     */
+    function rand(min, max){
+        min = min == null? MIN_INT : min;
+        max = max == null? MAX_INT : max;
+        return min + (max - min) * random();
+    }
+
+    module.exports = rand;
+
+
+},{"../number/MAX_INT":19,"../number/MIN_INT":20,"./random":31}],29:[function(require,module,exports){
+var choice = require('./choice');
+
+    var _chars = '0123456789abcdef'.split('');
+
+    /**
+     * Returns a random hexadecimal string
+     */
+    function randHex(size){
+        size = size && size > 0? size : 6;
+        var str = '';
+        while (size--) {
+            str += choice(_chars);
+        }
+        return str;
+    }
+
+    module.exports = randHex;
+
+
+
+},{"./choice":26}],30:[function(require,module,exports){
+var MIN_INT = require('../number/MIN_INT');
+var MAX_INT = require('../number/MAX_INT');
+var rand = require('./rand');
+
+    /**
+     * Gets random integer inside range or snap to min/max values.
+     */
+    function randInt(min, max){
+        min = min == null? MIN_INT : ~~min;
+        max = max == null? MAX_INT : ~~max;
+        // can't be max + 0.5 otherwise it will round up if `rand`
+        // returns `max` causing it to overflow range.
+        // -0.5 and + 0.49 are required to avoid bias caused by rounding
+        return Math.round( rand(min - 0.5, max + 0.499999999999) );
+    }
+
+    module.exports = randInt;
+
+
+},{"../number/MAX_INT":19,"../number/MIN_INT":20,"./rand":28}],31:[function(require,module,exports){
+
+
+    /**
+     * Just a wrapper to Math.random. No methods inside mout/random should call
+     * Math.random() directly so we can inject the pseudo-random number
+     * generator if needed (ie. in case we need a seeded random or a better
+     * algorithm than the native one)
+     */
+    function random(){
+        return random.get();
+    }
+
+    // we expose the method so it can be swapped if needed
+    random.get = Math.random;
+
+    module.exports = random;
+
+
+
+},{}],32:[function(require,module,exports){
+/**
+ * Helpers.
+ */
+
+var s = 1000;
+var m = s * 60;
+var h = m * 60;
+var d = h * 24;
+var y = d * 365.25;
+
+/**
+ * Parse or format the given `val`.
+ *
+ * Options:
+ *
+ *  - `long` verbose formatting [false]
+ *
+ * @param {String|Number} val
+ * @param {Object} [options]
+ * @throws {Error} throw an error if val is not a non-empty string or a number
+ * @return {String|Number}
+ * @api public
+ */
+
+module.exports = function(val, options) {
+  options = options || {};
+  var type = typeof val;
+  if (type === 'string' && val.length > 0) {
+    return parse(val);
+  } else if (type === 'number' && isNaN(val) === false) {
+    return options.long ? fmtLong(val) : fmtShort(val);
+  }
+  throw new Error(
+    'val is not a non-empty string or a valid number. val=' +
+      JSON.stringify(val)
+  );
+};
+
+/**
+ * Parse the given `str` and return milliseconds.
+ *
+ * @param {String} str
+ * @return {Number}
+ * @api private
+ */
+
+function parse(str) {
+  str = String(str);
+  if (str.length > 100) {
+    return;
+  }
+  var match = /^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(
+    str
+  );
+  if (!match) {
+    return;
+  }
+  var n = parseFloat(match[1]);
+  var type = (match[2] || 'ms').toLowerCase();
+  switch (type) {
+    case 'years':
+    case 'year':
+    case 'yrs':
+    case 'yr':
+    case 'y':
+      return n * y;
+    case 'days':
+    case 'day':
+    case 'd':
+      return n * d;
+    case 'hours':
+    case 'hour':
+    case 'hrs':
+    case 'hr':
+    case 'h':
+      return n * h;
+    case 'minutes':
+    case 'minute':
+    case 'mins':
+    case 'min':
+    case 'm':
+      return n * m;
+    case 'seconds':
+    case 'second':
+    case 'secs':
+    case 'sec':
+    case 's':
+      return n * s;
+    case 'milliseconds':
+    case 'millisecond':
+    case 'msecs':
+    case 'msec':
+    case 'ms':
+      return n;
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Short format for `ms`.
+ *
+ * @param {Number} ms
+ * @return {String}
+ * @api private
+ */
+
+function fmtShort(ms) {
+  if (ms >= d) {
+    return Math.round(ms / d) + 'd';
+  }
+  if (ms >= h) {
+    return Math.round(ms / h) + 'h';
+  }
+  if (ms >= m) {
+    return Math.round(ms / m) + 'm';
+  }
+  if (ms >= s) {
+    return Math.round(ms / s) + 's';
+  }
+  return ms + 'ms';
+}
+
+/**
+ * Long format for `ms`.
+ *
+ * @param {Number} ms
+ * @return {String}
+ * @api private
+ */
+
+function fmtLong(ms) {
+  return plural(ms, d, 'day') ||
+    plural(ms, h, 'hour') ||
+    plural(ms, m, 'minute') ||
+    plural(ms, s, 'second') ||
+    ms + ' ms';
+}
+
+/**
+ * Pluralization helper.
+ */
+
+function plural(ms, n, name) {
+  if (ms < n) {
+    return;
+  }
+  if (ms < n * 1.5) {
+    return Math.floor(ms / n) + ' ' + name;
+  }
+  return Math.ceil(ms / n) + ' ' + name + 's';
+}
+
+},{}],33:[function(require,module,exports){
 // Copyright (c) 2011, Chris Umbel
 
 var global = (Function('return this'))();
@@ -2104,7 +2635,7 @@ global.$P = exports.Plane.create;
 exports.Line.Segment = require('./line.segment');
 exports.Sylvester = require('./sylvester');
 
-},{"./line":13,"./line.segment":14,"./matrix":15,"./plane":16,"./sylvester":17,"./vector":18}],13:[function(require,module,exports){
+},{"./line":34,"./line.segment":35,"./matrix":36,"./plane":37,"./sylvester":38,"./vector":39}],34:[function(require,module,exports){
 // Copyright (c) 2011, Chris Umbel, James Coglan
 var Vector = require('./vector');
 var Matrix = require('./matrix');
@@ -2337,7 +2868,7 @@ Line.Z = Line.create(Vector.Zero(3), Vector.k);
 
 module.exports = Line;
 
-},{"./matrix":15,"./plane":16,"./sylvester":17,"./vector":18}],14:[function(require,module,exports){
+},{"./matrix":36,"./plane":37,"./sylvester":38,"./vector":39}],35:[function(require,module,exports){
 // Copyright (c) 2011, Chris Umbel, James Coglan
 // Line.Segment class - depends on Line and its dependencies.
 
@@ -2465,7 +2996,7 @@ Line.Segment.create = function(v1, v2) {
 
 module.exports = Line.Segment;
 
-},{"./line":13,"./vector":18}],15:[function(require,module,exports){
+},{"./line":34,"./vector":39}],36:[function(require,module,exports){
 // Copyright (c) 2011, Chris Umbel, James Coglan
 // Matrix class - depends on Vector.
 
@@ -3460,7 +3991,7 @@ Matrix.Ones = function(n, m) {
 
 module.exports = Matrix;
 
-},{"./sylvester":17,"./vector":18,"fs":undefined}],16:[function(require,module,exports){
+},{"./sylvester":38,"./vector":39,"fs":undefined}],37:[function(require,module,exports){
 // Copyright (c) 2011, Chris Umbel, James Coglan
 // Plane class - depends on Vector. Some methods require Matrix and Line.
 var Vector = require('./vector');
@@ -3736,7 +4267,7 @@ Plane.fromPoints = function(points) {
 
 module.exports = Plane;
 
-},{"./line":13,"./matrix":15,"./sylvester":17,"./vector":18}],17:[function(require,module,exports){
+},{"./line":34,"./matrix":36,"./sylvester":38,"./vector":39}],38:[function(require,module,exports){
 // Copyright (c) 2011, Chris Umbel, James Coglan
 // This file is required in order for any other classes to work. Some Vector methods work with the
 // other Sylvester classes and are useless unless they are included. Other classes such as Line and
@@ -3753,7 +4284,7 @@ var Sylvester = {
 
 module.exports = Sylvester;
 
-},{}],18:[function(require,module,exports){
+},{}],39:[function(require,module,exports){
 // Copyright (c) 2011, Chris Umbel, James Coglan
 // This file is required in order for any other classes to work. Some Vector methods work with the
 // other Sylvester classes and are useless unless they are included. Other classes such as Line and
@@ -4193,7 +4724,185 @@ Vector.log = function(v) {
 
 module.exports = Vector;
 
-},{"./matrix":15,"./sylvester":17}],19:[function(require,module,exports){
+},{"./matrix":36,"./sylvester":38}],40:[function(require,module,exports){
+"use strict";
+
+var Class = require('../');
+var guid  = require('mout/random/guid');
+var forIn  = require('mout/object/forIn');
+
+var EventEmitter = new Class({
+  Binds : ['on', 'off', 'once', 'emit'],
+
+  callbacks : {},
+
+  initialize : function() {
+    var self = this;
+    this.addEvent = this.on;
+    this.removeListener = this.off;
+    this.removeAllListeners = this.off;
+    this.fireEvent = this.emit;
+  },
+
+  emit:function(event, payload){
+    if(!this.callbacks[event])
+      return;
+
+    var args = Array.prototype.slice.call(arguments, 1);
+
+    forIn(this.callbacks[event], function(callback){
+      callback.apply(null, args);
+    });
+  },
+
+
+  on:function(event, callback){
+    if(typeof callback != "function")
+      return console.log("you try to register a non function in " , event)
+    if(!this.callbacks[event])
+      this.callbacks[event] = {};
+    this.callbacks[event][guid()] = callback;
+  },
+
+  once:function(event, callback){
+    var self = this;
+    var once = function(){
+      self.off(event, once);
+      self.off(event, callback);
+    };
+
+    this.on(event, callback);
+    this.on(event, once);
+  },
+
+  off:function(event, callback){
+    if(!event)
+      this.callbacks = {};
+    else if(!callback)
+      this.callbacks[event] = {};
+    else forIn(this.callbacks[event] || {}, function(v, k) {
+      if(v == callback)
+        delete this.callbacks[event][k];
+    }, this);
+  },
+});
+
+module.exports = EventEmitter;
+},{"../":42,"mout/object/forIn":21,"mout/random/guid":27}],41:[function(require,module,exports){
+"use strict";
+
+var verbs = /^Implements|Extends|Binds$/
+
+module.exports = function(ctx, obj){
+  for(var key in obj) {
+    if(key.match(verbs)) continue;
+    if((typeof obj[key] == 'function') && obj[key].$static)
+      ctx[key] = obj[key];
+    else
+      ctx.prototype[key] = obj[key];
+  }
+  return ctx;
+}
+},{}],42:[function(require,module,exports){
+"use strict";
+
+var hasOwn = require("mout/object/hasOwn");
+var create = require("mout/lang/createObject");
+var merge  = require("mout/object/merge");
+var kindOf = require("mout/lang/kindOf");
+var mixIn  = require("mout/object/mixIn");
+
+var implement = require('./implement');
+var verbs = /^Implements|Extends|Binds$/
+
+
+
+
+var uClass = function(proto){
+
+  if(kindOf(proto) === "Function") proto = {initialize: proto};
+
+  var superprime = proto.Extends;
+
+  var constructor = (hasOwn(proto, "initialize")) ? proto.initialize : superprime ? superprime : function(){};
+
+
+
+  var out = function() {
+    var self = this;
+      //autobinding takes place here
+    if(proto.Binds) proto.Binds.forEach(function(f){
+      var original = self[f];
+      if(original)
+        self[f] = mixIn(self[f].bind(self), original);
+    });
+
+      //clone non function/static properties to current instance
+    for(var key in out.prototype) {
+      var v = out.prototype[key], t = kindOf(v);
+
+      if(key.match(verbs) || t === "Function" || t == "GeneratorFunction")
+        continue;
+
+      if(t == "Object")
+        self[key] = merge({}, self[key]); //create(null, self[key]);
+      else if(t == "Array")
+        self[key] = v.slice(); //clone ??
+      else
+        self[key] = v;
+    }
+
+    if(proto.Implements)
+      proto.Implements.forEach(function(Mixin){
+        Mixin.call(self);
+      });
+
+
+
+
+    constructor.apply(this, arguments);
+  }
+
+
+  if (superprime) {
+    // inherit from superprime
+      var superproto = superprime.prototype;
+      if(superproto.Binds)
+        proto.Binds = (proto.Binds || []).concat(superproto.Binds);
+
+      if(superproto.Implements)
+        proto.Implements = (proto.Implements || []).concat(superproto.Implements);
+
+      var cproto = out.prototype = create(superproto);
+      // setting constructor.parent to superprime.prototype
+      // because it's the shortest possible absolute reference
+      out.parent = superproto;
+      cproto.constructor = out
+
+  }
+
+
+ if(proto.Implements) {
+    if (kindOf(proto.Implements) !== "Array")
+      proto.Implements = [proto.Implements];
+    proto.Implements.forEach(function(Mixin){
+      implement(out, Mixin.prototype);
+    });
+  }
+
+  implement(out, proto);
+  if(proto.Binds)
+     out.prototype.Binds = proto.Binds;
+  if(proto.Implements)
+     out.prototype.Implements = proto.Implements;
+
+  return out;
+};
+
+
+
+module.exports = uClass;
+},{"./implement":41,"mout/lang/createObject":12,"mout/lang/kindOf":18,"mout/object/hasOwn":23,"mout/object/merge":24,"mout/object/mixIn":25}],43:[function(require,module,exports){
 "use strict";
 
 /**
@@ -4217,7 +4926,7 @@ Size.prototype = {
   }
 }
 module.exports = Size;
-},{}],20:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 "use strict";
 
 var error = require('./error');
@@ -4231,7 +4940,7 @@ function assert(condition, message) {
 
 module.exports = assert;
 
-},{"./error":21}],21:[function(require,module,exports){
+},{"./error":45}],45:[function(require,module,exports){
 "use strict";
 
 function error(message) {
@@ -4241,7 +4950,7 @@ function error(message) {
 
 module.exports = error;
 
-},{}],22:[function(require,module,exports){
+},{}],46:[function(require,module,exports){
 "use strict";
 
 var Matrix = require('sylvester.js').Matrix;
@@ -4360,7 +5069,7 @@ function makeFrustum(left, right,
 module.exports.makePerspective = makePerspective;
 
 
-},{"sylvester.js":12}],23:[function(require,module,exports){
+},{"sylvester.js":33}],47:[function(require,module,exports){
 "use strict";
 
 var Avc            = require('../broadway/Decoder');
@@ -4370,7 +5079,7 @@ var Size           = require('../utils/Size');
 var Class          = require('uclass');
 var Events         = require('uclass/events');
 var debug          = require('debug');
-var log            = debug("wsavc");
+var log            = console.log;// debug("wsavc");
 
 var WSAvcPlayer = new Class({
   Implements : [Events],
@@ -4414,7 +5123,7 @@ var WSAvcPlayer = new Class({
         naltype = "PPS";
       }
     }
-    //log("Passed " + naltype + " to decoder");
+    log("Passed " + naltype + " to decoder");
     this.avc.decode(data);
   },
 
@@ -4521,694 +5230,5 @@ var WSAvcPlayer = new Class({
 module.exports = WSAvcPlayer;
 module.exports.debug = debug;
 
-},{"../broadway/Decoder":4,"../canvas/YUVCanvas":10,"../canvas/YUVWebGLCanvas":11,"../utils/Size":19,"debug":1,"uclass":47,"uclass/events":24}],24:[function(require,module,exports){
-"use strict";
-
-var Class = require('../');
-var guid  = require('mout/random/guid');
-var forIn  = require('mout/object/forIn');
-
-var EventEmitter = new Class({
-  Binds : ['on', 'off', 'once', 'emit'],
-
-  callbacks : {},
-
-  initialize : function() {
-    var self = this;
-    this.addEvent = this.on;
-    this.removeListener = this.off;
-    this.removeAllListeners = this.off;
-    this.fireEvent = this.emit;
-  },
-
-  emit:function(event, payload){
-    if(!this.callbacks[event])
-      return;
-
-    var args = Array.prototype.slice.call(arguments, 1);
-
-    forIn(this.callbacks[event], function(callback){
-      callback.apply(null, args);
-    });
-  },
-
-
-  on:function(event, callback){
-    if(typeof callback != "function")
-      return console.log("you try to register a non function in " , event)
-    if(!this.callbacks[event])
-      this.callbacks[event] = {};
-    this.callbacks[event][guid()] = callback;
-  },
-
-  once:function(event, callback){
-    var self = this;
-    var once = function(){
-      self.off(event, once);
-      self.off(event, callback);
-    };
-
-    this.on(event, callback);
-    this.on(event, once);
-  },
-
-  off:function(event, callback){
-    if(!event)
-      this.callbacks = {};
-    else if(!callback)
-      this.callbacks[event] = {};
-    else forIn(this.callbacks[event] || {}, function(v, k) {
-      if(v == callback)
-        delete this.callbacks[event][k];
-    }, this);
-  },
-});
-
-module.exports = EventEmitter;
-},{"../":47,"mout/object/forIn":36,"mout/random/guid":42}],25:[function(require,module,exports){
-"use strict";
-
-var verbs = /^Implements|Extends|Binds$/
-
-module.exports = function(ctx, obj){
-  for(var key in obj) {
-    if(key.match(verbs)) continue;
-    if((typeof obj[key] == 'function') && obj[key].$static)
-      ctx[key] = obj[key];
-    else
-      ctx.prototype[key] = obj[key];
-  }
-  return ctx;
-}
-},{}],26:[function(require,module,exports){
-var kindOf = require('./kindOf');
-var isPlainObject = require('./isPlainObject');
-var mixIn = require('../object/mixIn');
-
-    /**
-     * Clone native types.
-     */
-    function clone(val){
-        switch (kindOf(val)) {
-            case 'Object':
-                return cloneObject(val);
-            case 'Array':
-                return cloneArray(val);
-            case 'RegExp':
-                return cloneRegExp(val);
-            case 'Date':
-                return cloneDate(val);
-            default:
-                return val;
-        }
-    }
-
-    function cloneObject(source) {
-        if (isPlainObject(source)) {
-            return mixIn({}, source);
-        } else {
-            return source;
-        }
-    }
-
-    function cloneRegExp(r) {
-        var flags = '';
-        flags += r.multiline ? 'm' : '';
-        flags += r.global ? 'g' : '';
-        flags += r.ignoreCase ? 'i' : '';
-        return new RegExp(r.source, flags);
-    }
-
-    function cloneDate(date) {
-        return new Date(+date);
-    }
-
-    function cloneArray(arr) {
-        return arr.slice();
-    }
-
-    module.exports = clone;
-
-
-
-},{"../object/mixIn":40,"./isPlainObject":32,"./kindOf":33}],27:[function(require,module,exports){
-var mixIn = require('../object/mixIn');
-
-    /**
-     * Create Object using prototypal inheritance and setting custom properties.
-     * - Mix between Douglas Crockford Prototypal Inheritance <http://javascript.crockford.com/prototypal.html> and the EcmaScript 5 `Object.create()` method.
-     * @param {object} parent    Parent Object.
-     * @param {object} [props] Object properties.
-     * @return {object} Created object.
-     */
-    function createObject(parent, props){
-        function F(){}
-        F.prototype = parent;
-        return mixIn(new F(), props);
-
-    }
-    module.exports = createObject;
-
-
-
-},{"../object/mixIn":40}],28:[function(require,module,exports){
-var clone = require('./clone');
-var forOwn = require('../object/forOwn');
-var kindOf = require('./kindOf');
-var isPlainObject = require('./isPlainObject');
-
-    /**
-     * Recursively clone native types.
-     */
-    function deepClone(val, instanceClone) {
-        switch ( kindOf(val) ) {
-            case 'Object':
-                return cloneObject(val, instanceClone);
-            case 'Array':
-                return cloneArray(val, instanceClone);
-            default:
-                return clone(val);
-        }
-    }
-
-    function cloneObject(source, instanceClone) {
-        if (isPlainObject(source)) {
-            var out = {};
-            forOwn(source, function(val, key) {
-                this[key] = deepClone(val, instanceClone);
-            }, out);
-            return out;
-        } else if (instanceClone) {
-            return instanceClone(source);
-        } else {
-            return source;
-        }
-    }
-
-    function cloneArray(arr, instanceClone) {
-        var out = [],
-            i = -1,
-            n = arr.length,
-            val;
-        while (++i < n) {
-            out[i] = deepClone(arr[i], instanceClone);
-        }
-        return out;
-    }
-
-    module.exports = deepClone;
-
-
-
-
-},{"../object/forOwn":37,"./clone":26,"./isPlainObject":32,"./kindOf":33}],29:[function(require,module,exports){
-var isKind = require('./isKind');
-    /**
-     */
-    var isArray = Array.isArray || function (val) {
-        return isKind(val, 'Array');
-    };
-    module.exports = isArray;
-
-
-},{"./isKind":30}],30:[function(require,module,exports){
-var kindOf = require('./kindOf');
-    /**
-     * Check if value is from a specific "kind".
-     */
-    function isKind(val, kind){
-        return kindOf(val) === kind;
-    }
-    module.exports = isKind;
-
-
-},{"./kindOf":33}],31:[function(require,module,exports){
-var isKind = require('./isKind');
-    /**
-     */
-    function isObject(val) {
-        return isKind(val, 'Object');
-    }
-    module.exports = isObject;
-
-
-},{"./isKind":30}],32:[function(require,module,exports){
-
-
-    /**
-     * Checks if the value is created by the `Object` constructor.
-     */
-    function isPlainObject(value) {
-        return (!!value && typeof value === 'object' &&
-            value.constructor === Object);
-    }
-
-    module.exports = isPlainObject;
-
-
-
-},{}],33:[function(require,module,exports){
-
-
-    var _rKind = /^\[object (.*)\]$/,
-        _toString = Object.prototype.toString,
-        UNDEF;
-
-    /**
-     * Gets the "kind" of value. (e.g. "String", "Number", etc)
-     */
-    function kindOf(val) {
-        if (val === null) {
-            return 'Null';
-        } else if (val === UNDEF) {
-            return 'Undefined';
-        } else {
-            return _rKind.exec( _toString.call(val) )[1];
-        }
-    }
-    module.exports = kindOf;
-
-
-},{}],34:[function(require,module,exports){
-/**
- * @constant Maximum 32-bit signed integer value. (2^31 - 1)
- */
-
-    module.exports = 2147483647;
-
-
-},{}],35:[function(require,module,exports){
-/**
- * @constant Minimum 32-bit signed integer value (-2^31).
- */
-
-    module.exports = -2147483648;
-
-
-},{}],36:[function(require,module,exports){
-var hasOwn = require('./hasOwn');
-
-    var _hasDontEnumBug,
-        _dontEnums;
-
-    function checkDontEnum(){
-        _dontEnums = [
-                'toString',
-                'toLocaleString',
-                'valueOf',
-                'hasOwnProperty',
-                'isPrototypeOf',
-                'propertyIsEnumerable',
-                'constructor'
-            ];
-
-        _hasDontEnumBug = true;
-
-        for (var key in {'toString': null}) {
-            _hasDontEnumBug = false;
-        }
-    }
-
-    /**
-     * Similar to Array/forEach but works over object properties and fixes Don't
-     * Enum bug on IE.
-     * based on: http://whattheheadsaid.com/2010/10/a-safer-object-keys-compatibility-implementation
-     */
-    function forIn(obj, fn, thisObj){
-        var key, i = 0;
-        // no need to check if argument is a real object that way we can use
-        // it for arrays, functions, date, etc.
-
-        //post-pone check till needed
-        if (_hasDontEnumBug == null) checkDontEnum();
-
-        for (key in obj) {
-            if (exec(fn, obj, key, thisObj) === false) {
-                break;
-            }
-        }
-
-
-        if (_hasDontEnumBug) {
-            var ctor = obj.constructor,
-                isProto = !!ctor && obj === ctor.prototype;
-
-            while (key = _dontEnums[i++]) {
-                // For constructor, if it is a prototype object the constructor
-                // is always non-enumerable unless defined otherwise (and
-                // enumerated above).  For non-prototype objects, it will have
-                // to be defined on this object, since it cannot be defined on
-                // any prototype objects.
-                //
-                // For other [[DontEnum]] properties, check if the value is
-                // different than Object prototype value.
-                if (
-                    (key !== 'constructor' ||
-                        (!isProto && hasOwn(obj, key))) &&
-                    obj[key] !== Object.prototype[key]
-                ) {
-                    if (exec(fn, obj, key, thisObj) === false) {
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    function exec(fn, obj, key, thisObj){
-        return fn.call(thisObj, obj[key], key, obj);
-    }
-
-    module.exports = forIn;
-
-
-
-},{"./hasOwn":38}],37:[function(require,module,exports){
-var hasOwn = require('./hasOwn');
-var forIn = require('./forIn');
-
-    /**
-     * Similar to Array/forEach but works over object properties and fixes Don't
-     * Enum bug on IE.
-     * based on: http://whattheheadsaid.com/2010/10/a-safer-object-keys-compatibility-implementation
-     */
-    function forOwn(obj, fn, thisObj){
-        forIn(obj, function(val, key){
-            if (hasOwn(obj, key)) {
-                return fn.call(thisObj, obj[key], key, obj);
-            }
-        });
-    }
-
-    module.exports = forOwn;
-
-
-
-},{"./forIn":36,"./hasOwn":38}],38:[function(require,module,exports){
-
-
-    /**
-     * Safer Object.hasOwnProperty
-     */
-     function hasOwn(obj, prop){
-         return Object.prototype.hasOwnProperty.call(obj, prop);
-     }
-
-     module.exports = hasOwn;
-
-
-
-},{}],39:[function(require,module,exports){
-var hasOwn = require('./hasOwn');
-var deepClone = require('../lang/deepClone');
-var isObject = require('../lang/isObject');
-
-    /**
-     * Deep merge objects.
-     */
-    function merge() {
-        var i = 1,
-            key, val, obj, target;
-
-        // make sure we don't modify source element and it's properties
-        // objects are passed by reference
-        target = deepClone( arguments[0] );
-
-        while (obj = arguments[i++]) {
-            for (key in obj) {
-                if ( ! hasOwn(obj, key) ) {
-                    continue;
-                }
-
-                val = obj[key];
-
-                if ( isObject(val) && isObject(target[key]) ){
-                    // inception, deep merge objects
-                    target[key] = merge(target[key], val);
-                } else {
-                    // make sure arrays, regexp, date, objects are cloned
-                    target[key] = deepClone(val);
-                }
-
-            }
-        }
-
-        return target;
-    }
-
-    module.exports = merge;
-
-
-
-},{"../lang/deepClone":28,"../lang/isObject":31,"./hasOwn":38}],40:[function(require,module,exports){
-var forOwn = require('./forOwn');
-
-    /**
-    * Combine properties from all the objects into first one.
-    * - This method affects target object in place, if you want to create a new Object pass an empty object as first param.
-    * @param {object} target    Target Object
-    * @param {...object} objects    Objects to be combined (0...n objects).
-    * @return {object} Target Object.
-    */
-    function mixIn(target, objects){
-        var i = 0,
-            n = arguments.length,
-            obj;
-        while(++i < n){
-            obj = arguments[i];
-            if (obj != null) {
-                forOwn(obj, copyProp, target);
-            }
-        }
-        return target;
-    }
-
-    function copyProp(val, key){
-        this[key] = val;
-    }
-
-    module.exports = mixIn;
-
-
-},{"./forOwn":37}],41:[function(require,module,exports){
-var randInt = require('./randInt');
-var isArray = require('../lang/isArray');
-
-    /**
-     * Returns a random element from the supplied arguments
-     * or from the array (if single argument is an array).
-     */
-    function choice(items) {
-        var target = (arguments.length === 1 && isArray(items))? items : arguments;
-        return target[ randInt(0, target.length - 1) ];
-    }
-
-    module.exports = choice;
-
-
-
-},{"../lang/isArray":29,"./randInt":45}],42:[function(require,module,exports){
-var randHex = require('./randHex');
-var choice = require('./choice');
-
-  /**
-   * Returns pseudo-random guid (UUID v4)
-   * IMPORTANT: it's not totally "safe" since randHex/choice uses Math.random
-   * by default and sequences can be predicted in some cases. See the
-   * "random/random" documentation for more info about it and how to replace
-   * the default PRNG.
-   */
-  function guid() {
-    return (
-        randHex(8)+'-'+
-        randHex(4)+'-'+
-        // v4 UUID always contain "4" at this position to specify it was
-        // randomly generated
-        '4' + randHex(3) +'-'+
-        // v4 UUID always contain chars [a,b,8,9] at this position
-        choice(8, 9, 'a', 'b') + randHex(3)+'-'+
-        randHex(12)
-    );
-  }
-  module.exports = guid;
-
-
-},{"./choice":41,"./randHex":44}],43:[function(require,module,exports){
-var random = require('./random');
-var MIN_INT = require('../number/MIN_INT');
-var MAX_INT = require('../number/MAX_INT');
-
-    /**
-     * Returns random number inside range
-     */
-    function rand(min, max){
-        min = min == null? MIN_INT : min;
-        max = max == null? MAX_INT : max;
-        return min + (max - min) * random();
-    }
-
-    module.exports = rand;
-
-
-},{"../number/MAX_INT":34,"../number/MIN_INT":35,"./random":46}],44:[function(require,module,exports){
-var choice = require('./choice');
-
-    var _chars = '0123456789abcdef'.split('');
-
-    /**
-     * Returns a random hexadecimal string
-     */
-    function randHex(size){
-        size = size && size > 0? size : 6;
-        var str = '';
-        while (size--) {
-            str += choice(_chars);
-        }
-        return str;
-    }
-
-    module.exports = randHex;
-
-
-
-},{"./choice":41}],45:[function(require,module,exports){
-var MIN_INT = require('../number/MIN_INT');
-var MAX_INT = require('../number/MAX_INT');
-var rand = require('./rand');
-
-    /**
-     * Gets random integer inside range or snap to min/max values.
-     */
-    function randInt(min, max){
-        min = min == null? MIN_INT : ~~min;
-        max = max == null? MAX_INT : ~~max;
-        // can't be max + 0.5 otherwise it will round up if `rand`
-        // returns `max` causing it to overflow range.
-        // -0.5 and + 0.49 are required to avoid bias caused by rounding
-        return Math.round( rand(min - 0.5, max + 0.499999999999) );
-    }
-
-    module.exports = randInt;
-
-
-},{"../number/MAX_INT":34,"../number/MIN_INT":35,"./rand":43}],46:[function(require,module,exports){
-
-
-    /**
-     * Just a wrapper to Math.random. No methods inside mout/random should call
-     * Math.random() directly so we can inject the pseudo-random number
-     * generator if needed (ie. in case we need a seeded random or a better
-     * algorithm than the native one)
-     */
-    function random(){
-        return random.get();
-    }
-
-    // we expose the method so it can be swapped if needed
-    random.get = Math.random;
-
-    module.exports = random;
-
-
-
-},{}],47:[function(require,module,exports){
-"use strict";
-
-var hasOwn = require("mout/object/hasOwn");
-var create = require("mout/lang/createObject");
-var merge  = require("mout/object/merge");
-var kindOf = require("mout/lang/kindOf");
-var mixIn  = require("mout/object/mixIn");
-
-var implement = require('./implement');
-var verbs = /^Implements|Extends|Binds$/
-
-
-
-
-var uClass = function(proto){
-
-  if(kindOf(proto) === "Function") proto = {initialize: proto};
-
-  var superprime = proto.Extends;
-
-  var constructor = (hasOwn(proto, "initialize")) ? proto.initialize : superprime ? superprime : function(){};
-
-
-
-  var out = function() {
-    var self = this;
-      //autobinding takes place here
-    if(proto.Binds) proto.Binds.forEach(function(f){
-      var original = self[f];
-      if(original)
-        self[f] = mixIn(self[f].bind(self), original);
-    });
-
-      //clone non function/static properties to current instance
-    for(var key in out.prototype) {
-      var v = out.prototype[key], t = kindOf(v);
-
-      if(key.match(verbs) || t === "Function" || t == "GeneratorFunction")
-        continue;
-
-      if(t == "Object")
-        self[key] = merge({}, self[key]); //create(null, self[key]);
-      else if(t == "Array")
-        self[key] = v.slice(); //clone ??
-      else
-        self[key] = v;
-    }
-
-    if(proto.Implements)
-      proto.Implements.forEach(function(Mixin){
-        Mixin.call(self);
-      });
-
-
-
-
-    constructor.apply(this, arguments);
-  }
-
-
-  if (superprime) {
-    // inherit from superprime
-      var superproto = superprime.prototype;
-      if(superproto.Binds)
-        proto.Binds = (proto.Binds || []).concat(superproto.Binds);
-
-      if(superproto.Implements)
-        proto.Implements = (proto.Implements || []).concat(superproto.Implements);
-
-      var cproto = out.prototype = create(superproto);
-      // setting constructor.parent to superprime.prototype
-      // because it's the shortest possible absolute reference
-      out.parent = superproto;
-      cproto.constructor = out
-
-  }
-
-
- if(proto.Implements) {
-    if (kindOf(proto.Implements) !== "Array")
-      proto.Implements = [proto.Implements];
-    proto.Implements.forEach(function(Mixin){
-      implement(out, Mixin.prototype);
-    });
-  }
-
-  implement(out, proto);
-  if(proto.Binds)
-     out.prototype.Binds = proto.Binds;
-  if(proto.Implements)
-     out.prototype.Implements = proto.Implements;
-
-  return out;
-};
-
-
-
-module.exports = uClass;
-},{"./implement":25,"mout/lang/createObject":27,"mout/lang/kindOf":33,"mout/object/hasOwn":38,"mout/object/merge":39,"mout/object/mixIn":40}]},{},[23])(23)
+},{"../broadway/Decoder":1,"../canvas/YUVCanvas":7,"../canvas/YUVWebGLCanvas":8,"../utils/Size":43,"debug":9,"uclass":42,"uclass/events":40}]},{},[47])(47)
 });

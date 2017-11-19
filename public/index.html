@@ -7,17 +7,21 @@
     <button type="button" onclick="wsavc.playStream()">Start Video</button>
     <button type="button" onclick="wsavc.stopStream()">Stop Video</button>
     <button type="button" onclick="wsavc.disconnect()">Disconnect</button>
+    
     <br/>
+    <canvas id='cam' style="width:100%; height:75vw;">
 
   <!-- provide WSAvcPlayer -->
     <script type="text/javascript" src="http-live-player.js">;</script>
     <script type="text/javascript">
 
-var canvas = document.createElement("canvas");
-document.body.appendChild(canvas);
+//var canvas = document.createElement("canvas");
+var canvas = document.getElementById('cam')
+//document.body.appendChild(canvas);
 
 // Create h264 player
-var uri = "ws://" + document.location.host;
+//var uri = "ws://" + document.location.host;
+var uri = "ws://localhost:3333/"
 var wsavc = new WSAvcPlayer(canvas, "webgl", 1, 35);
 wsavc.connect(uri);
 
@@ -26,5 +30,6 @@ wsavc.connect(uri);
 window.wsavc = wsavc;
 
     </script>
+    
   </body>
 </html>
