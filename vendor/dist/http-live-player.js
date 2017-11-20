@@ -5079,7 +5079,7 @@ var Size           = require('../utils/Size');
 var Class          = require('uclass');
 var Events         = require('uclass/events');
 var debug          = require('debug');
-var log            = console.log;// debug("wsavc");
+var log            =  debug("wsavc");
 
 var WSAvcPlayer = new Class({
   Implements : [Events],
