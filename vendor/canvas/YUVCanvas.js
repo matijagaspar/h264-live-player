@@ -1,17 +1,13 @@
 "use strict";
-var Class = require('uclass');
-
-var YUVCanvas = new Class({
-
-  Binds : ['decode'],
-
-  initialize : function(canvas, size) {
+class YUVCanvas {
+  initialize (canvas, size) {
     this.canvas = canvas;
     this.canvasCtx = this.canvas.getContext("2d");
     this.canvasBuffer = this.canvasCtx.createImageData(size.w, size.h);
-  },
-
-  decode : function (buffer, width, height) {
+  }
+  
+  //binds
+  decode = (buffer, width, height) => {
     if (!buffer)
       return;
 
@@ -43,9 +39,7 @@ var YUVCanvas = new Class({
     
     var date = new Date();
     //console.log("WSAvcPlayer: Decode time: " + (date.getTime() - this.rcvtime) + " ms");
-  },
-
-});
-
+  }
+}
 
 module.exports = YUVCanvas;

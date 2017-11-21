@@ -4,9 +4,10 @@ var Program     = require('./Program');
 var Shader      = require('./Shader');
 var Texture     = require('./Texture');
 var Script      = require('./Script');
-var WebGLCanvas = require('./WebGLCanvas');
 
-var Class       = require('uclass');
+//TODO: rest of the module with statics.
+import WebGLCanvas from './WebGLCanvas'
+
 
 var vertexShaderScript = Script.createFromSource("x-shader/x-vertex", `
   attribute vec3 aVertexPosition;
@@ -41,17 +42,13 @@ var fragmentShaderScript = Script.createFromSource("x-shader/x-fragment", `
 `);
 
 
+class YUVWebGLCanvas extends WebGLCanvas{
+  
+  constructor(canvas, size) {
+    super(canvas, size);
+  }
 
-
-var YUVWebGLCanvas = new Class({
-  Extends  : WebGLCanvas,
-  Binds : ['decode'],
-
-  initialize : function(canvas, size) {
-    YUVWebGLCanvas.parent.initialize.call(this, canvas, size);
-  },
-
-  onInitShaders: function() {
+  onInitShaders() {
     this.program = new Program(this.gl);
     this.program.attach(new Shader(this.gl, vertexShaderScript));
     this.program.attach(new Shader(this.gl, fragmentShaderScript));
@@ -61,28 +58,26 @@ var YUVWebGLCanvas = new Class({
     this.gl.enableVertexAttribArray(this.vertexPositionAttribute);
     this.textureCoordAttribute = this.program.getAttributeLocation("aTextureCoord");;
     this.gl.enableVertexAttribArray(this.textureCoordAttribute);
-  },
+  }
 
-  onInitTextures: function () {
-    console.log("creatingTextures: size: " + this.size);
+  onInitTextures() {
+    //console.log("creatingTextures: size: " + this.size);
     this.YTexture = new Texture(this.gl, this.size);
     this.UTexture = new Texture(this.gl, this.size.getHalfSize());
     this.VTexture = new Texture(this.gl, this.size.getHalfSize());
-  },
-
-  onInitSceneTextures: function () {
+  }
+  onInitSceneTextures () {
     this.YTexture.bind(0, this.program, "YTexture");
     this.UTexture.bind(1, this.program, "UTexture");
     this.VTexture.bind(2, this.program, "VTexture");
-  },
-
-  fillYUVTextures: function(y, u, v) {
+  }
+  fillYUVTextures(y, u, v) {
     this.YTexture.fill(y);
     this.UTexture.fill(u);
     this.VTexture.fill(v);
-  },
+  }
 
-  decode: function(buffer, width, height) {
+  decode = (buffer, width, height) => {
 
     if (!buffer)
       return;
@@ -94,15 +89,10 @@ var YUVWebGLCanvas = new Class({
     this.UTexture.fill(buffer.subarray(lumaSize, lumaSize + chromaSize));
     this.VTexture.fill(buffer.subarray(lumaSize + chromaSize, lumaSize + 2 * chromaSize));
     this.drawScene();
-  },
+  }
 
-  toString: function() {
+  toString() {
     return "YUVCanvas Size: " + this.size;
   }
-});
-
-
-
-
-
+}
 module.exports = YUVWebGLCanvas;

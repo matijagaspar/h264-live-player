@@ -3,20 +3,18 @@
 /**
  * Represents a 2-dimensional size value. 
  */
-
-function Size(w, h) {
-  this.w = w;
-  this.h = h;
-}
-
-Size.prototype = {
-  toString: function () {
+class Size { 
+  constructor(w,h){
+    this.w = w;
+    this.h = h;
+  }
+  toString () {
     return "(" + this.w + ", " + this.h + ")";
-  },
-  getHalfSize: function() {
+  }
+  getHalfSize () {
     return new Size(this.w >>> 1, this.h >>> 1);
-  },
-  length: function() {
+  }
+  length () {
     return this.w * this.h;
   }
 }

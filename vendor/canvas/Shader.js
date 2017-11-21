@@ -7,7 +7,6 @@ var error = require('../utils/error');
  * script tags.
  */
 
-
 function Shader(gl, script) {
   
   // Now figure out what type of shader script we have, based on its MIME type.

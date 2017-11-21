@@ -14,6 +14,7 @@ const app                = express();
   //public website
 app.use(express.static(__dirname + '/public'));
 app.use(express.static(__dirname + '/vendor/dist'));
+app.use(express.static(__dirname + '/vendor/dist_webpack'));
 
 const server  = http.createServer(app);
 
@@ -22,6 +23,8 @@ const feed    = new RemoteTCPFeedRelay(server, {
   feed_port : 5001,
   width : 640,
   height: 480,
+  /*width: 1024,
+  height: 576,*/
 });
 
 
