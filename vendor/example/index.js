@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 const AvcServer = require('../lib/server')
 const path = require('path')
 const http = require('http')
@@ -16,10 +17,17 @@ const server = http.createServer(app)
 
 // init web socket
 const wss = new WebSocketServer({ /* port: 3333 */ server })
-// init the avc server. 
+// init the avc server.
 const avcServer = new AvcServer(wss, 640, 480)
 
-// create the tcp stream server
+// handling custom events from client
+avcServer.client_events.on('custom_event_from_client', e => {
+    console.log('a client sent', e)
+    // broadcasting custom events to all clients (if you wish to send a event to specific client, handle sockets and new connections yourself)
+    avcServer.broadcast('custom_event_from_server', { hello: 'from server' })
+})
+
+// create the tcp sever that accepts a h264 stream and broadcasts it back to the clients
 this.tcpServer = net.createServer((socket) => {
     // set video stream
     avcServer.setVideoStream(socket)

@@ -6,10 +6,9 @@
     "lib/"
   ],
   "scripts": {
-    "build:test": "npm run build",
+    "example": "node example/index.js",
     "build": "cross-env NODE_ENV=production webpack",
     "build:dev": "webpack",
-    "example": "webpack --config=example/webpack.config.js",
     "lint": "eslint .",
     "lint-fix": "eslint . --fix",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -31,7 +30,7 @@
   "bugs": {
     "url": "https://github.com/131/h264-live-player/issues"
   },
-  "description": "Video player for browser that is able to play realtime low latency h264 video stream from websocket.\n Based of h264-live-player(https://github.com/131/h264-live-player) and using [Broadway](https://github.com/mbebenita/Broadway) Decoder",
+  "description": "Video player for browser that is able to play realtime low latency h264 video stream from websocket.\n Based of h264-live-player(https://github.com/131/h264-live-player) that uses [Broadway](https://github.com/mbebenita/Broadway) Decoder. Meant for Raspberry pi cam",
   "dependencies": {
     "debug": "^2.3.2",
     "stream-split": "^1.1.0",

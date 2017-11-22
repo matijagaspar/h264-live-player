@@ -62,27 +62,27 @@ class WSAvcPlayer extends EventEmitter {
 
         */
         if (data.length > 4) {
-            if (data[4] == 0x65) {
+            if (data[4] === 0x65) {
                 naltype = 'I frame'
             }
-            else if (data[4] == 0x41) {
+            else if (data[4] === 0x41) {
                 naltype = 'P frame'
             }
-            else if (data[4] == 0x67) {
+            else if (data[4] === 0x67) {
                 naltype = 'SPS'
             }
-            else if (data[4] == 0x68) {
+            else if (data[4] === 0x68) {
                 naltype = 'PPS'
             }
         }
-        log('Passed ' + naltype + ' to decoder')
+        log(`Passed ${ naltype } to decoder ${ data[4] & 0x1f }`)
         this.avc.decode(data)
     }
 
     connect (url) {
 
         // Websocket initialization
-        if (this.ws != undefined) {
+        if (this.ws !== undefined) {
             this.ws.close()
             delete this.ws
         }
@@ -98,8 +98,10 @@ class WSAvcPlayer extends EventEmitter {
         let framesList = []
 
         this.ws.onmessage = (evt) => {
-            if (typeof evt.data == 'string')
+
+            if (typeof evt.data == 'string') {
                 return this.cmd(JSON.parse(evt.data))
+            }
 
             this.pktnum++
             const frame = new Uint8Array(evt.data)
@@ -141,29 +143,33 @@ class WSAvcPlayer extends EventEmitter {
         }
 
         return this.ws
-
     }
 
     initCanvas (width, height) {
-        const canvasFactory = this.canvastype == 'webgl' || this.canvastype == 'YUVWebGLCanvas'
+        const canvasFactory = this.canvastype === 'webgl' || this.canvastype === 'YUVWebGLCanvas'
             ? YUVWebGLCanvas
             : YUVCanvas
 
         const canvas = new canvasFactory(this.canvas, new Size(width, height))
         this.avc.onPictureDecoded = canvas.decode
-        this.emit('canvas_initialized', width, height)
+
+        this.canvas.width = width
+        this.canvas.height = height
+
 
     }
 
     cmd (cmd) {
         log('Incoming request', cmd)
+        switch (cmd.action) {
+        case 'initalize': {
+            const { width, height } = cmd.payload
+            this.initCanvas(width, height)
+            return this.emit('initalized', cmd.payload)
 
-        if (cmd.action == 'init') {
-            this.initCanvas(cmd.width, cmd.height)
-            this.canvas.width = cmd.width
-            this.canvas.height = cmd.height
-        } else {
-            this.emit('message', cmd)
+        }
+        default:
+            return this.emit(cmd.action, cmd.payload)
         }
     }
 
@@ -171,9 +177,9 @@ class WSAvcPlayer extends EventEmitter {
         this.ws.close()
 
     }
-
-    sendToServer (message) {
-        this.ws.send(message)
+    // only send json!
+    send (action, payload) {
+        return this.ws.send(JSON.stringify({ action, payload }))
     }
 }
 

@@ -1,5 +1,3 @@
 /node_modules/*
-/src/broadway/Decoder.js
-/dist/*
-/dist_webpack/*
-/disc/*
+/player/broadway/Decoder.js
+/lib/WSAvcPlayer.js

@@ -37,7 +37,7 @@ export default class YUVCanvas {
 
       this.canvasCtx.putImageData(this.canvasBuffer, 0, 0)
 
-      const date = new Date()
+      // const date = new Date()
       // console.log("WSAvcPlayer: Decode time: " + (date.getTime() - this.rcvtime) + " ms");
   }
 }
