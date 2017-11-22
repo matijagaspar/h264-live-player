@@ -1741,6 +1741,10 @@ expand-range@^1.8.1:
   dependencies:
     fill-range "^2.1.0"
 
+expres@^0.0.5:
+  version "0.0.5"
+  resolved "https://registry.yarnpkg.com/expres/-/expres-0.0.5.tgz#bf4484749f83920cb116d6baf6da230220d1fb9c"
+
 express@^4.15.2:
   version "4.16.2"
   resolved "https://registry.yarnpkg.com/express/-/express-4.16.2.tgz#e35c6dfe2d64b7dca0a5cd4f21781be3299e076c"
@@ -3581,6 +3585,10 @@ stream-shift@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/stream-shift/-/stream-shift-1.0.0.tgz#d5c752825e5367e786f78e18e445ea223a155952"
 
+stream-split@^1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/stream-split/-/stream-split-1.1.0.tgz#d9b5c5e0fa0991a4da95f96e91f5f151804d3d3c"
+
 string-width@^1.0.1, string-width@^1.0.2:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/string-width/-/string-width-1.0.2.tgz#118bdf5b8cdc51a2a7e70d211e07e2b0b9b107d3"
@@ -3874,6 +3882,10 @@ utils-merge@1.0.1:
 uuid@^3.0.0:
   version "3.1.0"
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-3.1.0.tgz#3dd3d3e790abc24d7b0d3a034ffababe28ebbc04"
+
+uws@^9.14.0:
+  version "9.14.0"
+  resolved "https://registry.yarnpkg.com/uws/-/uws-9.14.0.tgz#fac8386befc33a7a3705cbd58dc47b430ca4dd95"
 
 v8flags@^2.1.1:
   version "2.1.1"

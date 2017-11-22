@@ -2,12 +2,14 @@
   "name": "ws-avc-player",
   "version": "0.1.0",
   "main": "lib/WSAvcPlayer.js",
-  "files":[
+  "files": [
     "lib/"
   ],
   "scripts": {
-    "dist": "cross-env NODE_ENV=production webpack",
-    "dev": "webpack",
+    "build:test": "npm run build",
+    "build": "cross-env NODE_ENV=production webpack",
+    "build:dev": "webpack",
+    "example": "webpack --config=example/webpack.config.js",
     "lint": "eslint .",
     "lint-fix": "eslint . --fix",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -32,6 +34,7 @@
   "description": "Video player for browser that is able to play realtime low latency h264 video stream from websocket.\n Based of h264-live-player(https://github.com/131/h264-live-player) and using [Broadway](https://github.com/mbebenita/Broadway) Decoder",
   "dependencies": {
     "debug": "^2.3.2",
+    "stream-split": "^1.1.0",
     "sylvester.js": "^0.1.1"
   },
   "devDependencies": {
@@ -44,7 +47,9 @@
     "cross-env": "^5.1.1",
     "eslint": "^4.11.0",
     "eslint-import-resolver-webpack": "^0.8.3",
+    "expres": "^0.0.5",
     "uglifyjs-webpack-plugin": "^1.1.0",
+    "uws": "^9.14.0",
     "webpack": "^3.8.1",
     "webpack-bundle-analyzer": "^2.9.1"
   }

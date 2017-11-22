@@ -1,0 +1,32 @@
+<html>
+  <head>
+    <title>h264-live-player web client demo</title>
+  </head>
+  <body>
+
+    <button type="button" onclick="wsavc.playStream()">Start Video</button>
+    <button type="button" onclick="wsavc.stopStream()">Stop Video</button>
+    <button type="button" onclick="wsavc.disconnect()">Disconnect</button>
+    
+    <br/>
+    <canvas id='cam' style="width:100%; height:75vw;">
+
+  <!-- provide WSAvcPlayer -->
+    <script type="text/javascript" src="WSAvcPlayer.js">;</script>
+    <script type="text/javascript">
+      var canvas = document.getElementById('cam')
+
+      // Create h264 player
+      var wsavc = new WSAvcPlayer(canvas, "webgl", 1, 35);
+      //expose instance for button callbacks
+      window.wsavc = wsavc;
+      
+      //maybe get rid of the ws inside the player?
+      var uri = "ws://" + document.location.host;
+      //var uri = "ws://localhost:3333/"
+      wsavc.connect(uri);
+
+    </script>
+    
+  </body>
+</html>
