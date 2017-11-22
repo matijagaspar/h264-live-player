@@ -1,9 +1,11 @@
 {
-  "name": "h264-live-player",
-  "version": "1.3.1",
-  "main": "wsavc/index.js",
+  "name": "ws-avc-player",
+  "version": "0.1.0",
+  "main": "lib/WSAvcPlayer.js",
   "scripts": {
-    "dist": "browserify  --bare --standalone WSAvcPlayer --plugin discify wsavc/ > dist/http-live-player.js",
+    "dist": "webpack",
+    "lint": "eslint .",
+    "lint-fix": "eslint . --fix",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -15,29 +17,30 @@
     "nal",
     "live",
     "broadcast",
-    "streaming"
+    "streaming",
+    "video"
   ],
-  "author": "Francois Leurent <131.js@cloudyks.org>",
+  "author": "Matija Gaspar (http://github.com/matijagaspar)",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/131/h264-live-player/issues"
   },
-  "description": "This is a very simple h264 video player (that can run on live stream) for your browser.\r You might use this with raspicam raw h264 stream.\r This is a player around [Broadway](https://github.com/mbebenita/Broadway) Decoder, with very simple API.\r NAL unit (h264 frames) are split on the server side, so the client side is very simple (and allow frame skipping easily)",
+  "description": "Video player for browser that is able to play realtime low latency h264 video stream from websocket.\n Based of h264-live-player(https://github.com/131/h264-live-player) and using [Broadway](https://github.com/mbebenita/Broadway) Decoder",
   "dependencies": {
     "debug": "^2.3.2",
-    "sylvester.js": "^0.1.1",
-    "uclass": "^2.4.0",
-    "uglifyjs-webpack-plugin": "^1.1.0",
-    "webpack": "^3.8.1"
+    "sylvester.js": "^0.1.1"
   },
   "devDependencies": {
     "babel-cli": "^6.26.0",
     "babel-core": "^6.26.0",
+    "babel-eslint": "^8.0.2",
     "babel-loader": "^7.1.2",
     "babel-preset-env": "^1.6.1",
     "babel-preset-stage-1": "^6.24.1",
-    "browserify": "^13.0.0",
-    "discify": "^1.4.2",
+    "eslint": "^4.11.0",
+    "eslint-import-resolver-webpack": "^0.8.3",
+    "uglifyjs-webpack-plugin": "^1.1.0",
+    "webpack": "^3.8.1",
     "webpack-bundle-analyzer": "^2.9.1"
   }
 }

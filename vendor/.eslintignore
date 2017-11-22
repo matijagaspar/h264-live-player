@@ -1,0 +1,5 @@
+/node_modules/*
+/src/broadway/Decoder.js
+/dist/*
+/dist_webpack/*
+/disc/*

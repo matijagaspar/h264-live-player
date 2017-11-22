@@ -13,7 +13,7 @@ const app                = express();
 
   //public website
 app.use(express.static(__dirname + '/public'));
-app.use(express.static(__dirname + '/vendor/dist'));
+app.use(express.static(__dirname + '/vendor/lib'));
 app.use(express.static(__dirname + '/vendor/dist_webpack'));
 
 const server  = http.createServer(app);
