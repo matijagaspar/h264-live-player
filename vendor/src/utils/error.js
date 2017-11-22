@@ -1,8 +1,6 @@
 'use strict'
 
-function error (message) {
+export default function error (message) {
     console.error(message)
     console.trace()
 }
-
-module.exports = error

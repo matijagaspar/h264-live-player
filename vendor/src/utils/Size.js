@@ -3,7 +3,7 @@
 /**
  * Represents a 2-dimensional size value.
  */
-class Size {
+export default class Size {
     constructor (w, h) {
         this.w = w
         this.h = h
@@ -18,4 +18,3 @@ class Size {
         return this.w * this.h
     }
 }
-module.exports = Size

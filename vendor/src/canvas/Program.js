@@ -1,7 +1,7 @@
 'use strict'
-const assert = require('../utils/assert')
+import assert from 'utils/assert'
 
-class Program {
+export default class Program {
     constructor (gl) {
         this.gl = gl
         this.program = this.gl.createProgram()
@@ -26,5 +26,3 @@ class Program {
         this.gl.uniformMatrix4fv(uniform, false, array)
     }
 }
-
-module.exports = Program

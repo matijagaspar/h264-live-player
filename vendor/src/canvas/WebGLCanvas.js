@@ -7,10 +7,10 @@
 
  */
 
-const Script = require('./Script')
-const error = require('../utils/error')
-const makePerspective = require('../utils/glUtils').makePerspective
-const Matrix = require('sylvester.js').Matrix
+import Script from './Script'
+import error from 'utils/error'
+import { makePerspective } from 'utils/glUtils'
+import { Matrix } from 'sylvester.js'
 
 
 const vertexShaderScript = Script.createFromSource('x-shader/x-vertex', `
@@ -186,7 +186,7 @@ export default class WebGLCanvas {
 
     checkLastError (operation) {
         const err = this.gl.getError()
-        if (err != this.gl.NO_ERROR) {
+        if (err !== this.gl.NO_ERROR) {
             let name = this.glNames[err]
             name = name !== undefined ? name + '(' + err + ')' :
                 'Unknown WebGL ENUM (0x' + value.toString(16) + ')'
@@ -202,7 +202,9 @@ export default class WebGLCanvas {
     onInitWebGL () {
         try {
             this.gl = this.canvas.getContext('experimental-webgl')
-        } catch (e) {}
+        } catch (e) {
+            console.warn('failed to initGL', e)
+        }
 
         if (!this.gl) {
             error('Unable to initialize WebGL. Your browser may not support it.')
@@ -258,7 +260,9 @@ function resize (canvas) {
     const displayHeight = canvas.clientHeight
 
     // Check if the canvas is not the same size.
+    // eslint-disable-next-line eqeqeq
     if (canvas.width != displayWidth ||
+    // eslint-disable-next-line eqeqeq
       canvas.height != displayHeight) {
 
     // Make the canvas the same size
@@ -266,5 +270,3 @@ function resize (canvas) {
         canvas.height = displayHeight
     }
 }
-
-// module.exports = WebGLCanvas;

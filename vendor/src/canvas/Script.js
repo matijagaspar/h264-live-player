@@ -1,12 +1,12 @@
 'use strict'
 
-const assert = require('../utils/assert')
+import assert from 'utils/assert'
 
 /**
  * Represents a WebGL shader script.
  */
 
-function Script () {}
+export default function Script () {}
 
 Script.createFromElementId = function (id) {
     const script = document.getElementById(id)
@@ -36,6 +36,3 @@ Script.createFromSource = function (type, source) {
     res.source = source
     return res
 }
-
-
-module.exports = Script

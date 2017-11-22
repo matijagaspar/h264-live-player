@@ -1,35 +1,34 @@
 'use strict'
 
-const Matrix = require('sylvester.js').Matrix
-const Vector = require('sylvester.js').Vector
+import { Matrix, Vector } from 'sylvester.js'
 const $M = Matrix.create
 
 
 // augment Sylvester some
 Matrix.Translation = function (v)
 {
-    if (v.elements.length == 2) {
-        var r = Matrix.I(3)
+    if (v.elements.length === 2) {
+        const r = Matrix.I(3)
         r.elements[2][0] = v.elements[0]
         r.elements[2][1] = v.elements[1]
         return r
     }
 
-    if (v.elements.length == 3) {
-        var r = Matrix.I(4)
+    if (v.elements.length === 3) {
+        const r = Matrix.I(4)
         r.elements[0][3] = v.elements[0]
         r.elements[1][3] = v.elements[1]
         r.elements[2][3] = v.elements[2]
         return r
     }
 
-    throw 'Invalid length for Translation'
+    throw new Error('Invalid length for Translation')
 }
 
 Matrix.prototype.flatten = function ()
 {
     const result = []
-    if (this.elements.length == 0)
+    if (this.elements.length === 0)
         return []
 
 
@@ -41,31 +40,31 @@ Matrix.prototype.flatten = function ()
 
 Matrix.prototype.ensure4x4 = function ()
 {
-    if (this.elements.length == 4 &&
-        this.elements[0].length == 4)
+    if (this.elements.length === 4 &&
+        this.elements[0].length === 4)
         return this
 
     if (this.elements.length > 4 ||
         this.elements[0].length > 4)
         return null
 
-    for (var i = 0; i < this.elements.length; i++) {
+    for (let i = 0; i < this.elements.length; i++) {
         for (let j = this.elements[i].length; j < 4; j++) {
-            if (i == j)
+            if (i === j)
                 this.elements[i].push(1)
             else
                 this.elements[i].push(0)
         }
     }
 
-    for (var i = this.elements.length; i < 4; i++) {
-        if (i == 0)
+    for (let i = this.elements.length; i < 4; i++) {
+        if (i === 0)
             this.elements.push([ 1, 0, 0, 0 ])
-        else if (i == 1)
+        else if (i === 1)
             this.elements.push([ 0, 1, 0, 0 ])
-        else if (i == 2)
+        else if (i === 2)
             this.elements.push([ 0, 0, 1, 0 ])
-        else if (i == 3)
+        else if (i === 3)
             this.elements.push([ 0, 0, 0, 1 ])
     }
 
@@ -82,7 +81,7 @@ Vector.prototype.flatten = function ()
 //
 // gluPerspective
 //
-function makePerspective (fovy, aspect, znear, zfar)
+export function makePerspective (fovy, aspect, znear, zfar)
 {
     const ymax = znear * Math.tan(fovy * Math.PI / 360.0)
     const ymin = -ymax
@@ -95,7 +94,7 @@ function makePerspective (fovy, aspect, znear, zfar)
 //
 // glFrustum
 //
-function makeFrustum (left, right,
+export function makeFrustum (left, right,
     bottom, top,
     znear, zfar)
 {
@@ -111,5 +110,3 @@ function makeFrustum (left, right,
         [ 0, 0, C, D ],
         [ 0, 0, -1, 0 ]])
 }
-
-module.exports.makePerspective = makePerspective

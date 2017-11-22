@@ -1,9 +1,9 @@
 'use strict'
 
-const Program = require('./Program')
-const Shader = require('./Shader')
-const Texture = require('./Texture')
-const Script = require('./Script')
+import Program from './Program'
+import Shader from './Shader'
+import Texture from './Texture'
+import Script from './Script'
 
 // TODO: rest of the module with statics.
 import WebGLCanvas from './WebGLCanvas'
@@ -42,7 +42,7 @@ const fragmentShaderScript = Script.createFromSource('x-shader/x-fragment', `
 `)
 
 
-class YUVWebGLCanvas extends WebGLCanvas {
+export default class YUVWebGLCanvas extends WebGLCanvas {
 
     constructor (canvas, size) {
         super(canvas, size)
@@ -95,4 +95,3 @@ class YUVWebGLCanvas extends WebGLCanvas {
       return 'YUVCanvas Size: ' + this.size
   }
 }
-module.exports = YUVWebGLCanvas

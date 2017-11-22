@@ -1,11 +1,11 @@
 'use strict'
 
-const assert = require('../utils/assert')
+import assert from 'utils/assert'
 let textureIDs = null
 /**
  * Represents a WebGL texture object.
  */
-class Texture {
+export default class Texture {
     constructor (gl, size, format) {
         this.gl = gl
         this.size = size
@@ -42,5 +42,3 @@ class Texture {
     }
 
 }
-
-module.exports = Texture

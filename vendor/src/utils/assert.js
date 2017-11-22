@@ -1,12 +1,9 @@
 'use strict'
 
-const error = require('./error')
+import error from './error'
 
-function assert (condition, message) {
+export default function assert (condition, message) {
     if (!condition) {
         error(message)
     }
 }
-
-
-module.exports = assert

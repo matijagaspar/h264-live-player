@@ -1,5 +1,5 @@
 'use strict'
-class YUVCanvas {
+export default class YUVCanvas {
     initialize (canvas, size) {
         this.canvas = canvas
         this.canvasCtx = this.canvas.getContext('2d')
@@ -41,5 +41,3 @@ class YUVCanvas {
       // console.log("WSAvcPlayer: Decode time: " + (date.getTime() - this.rcvtime) + " ms");
   }
 }
-
-module.exports = YUVCanvas

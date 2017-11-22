@@ -1,15 +1,15 @@
 'use strict'
 
-const Avc = require('broadway/Decoder')
-const YUVWebGLCanvas = require('canvas/YUVWebGLCanvas')
-const YUVCanvas = require('canvas/YUVCanvas')
-const Size = require('utils/Size')
-const EventEmitter = require('events').EventEmitter
+import Avc from 'broadway/Decoder'
+import YUVWebGLCanvas from 'canvas/YUVWebGLCanvas'
+import YUVCanvas from 'canvas/YUVCanvas'
+import Size from 'utils/Size'
+import { EventEmitter } from 'events'
 
-const debug = require('debug')
+import debug from 'debug' // ?? why?
+
+
 const log = debug('wsavc')
-
-
 class WSAvcPlayer extends EventEmitter {
     constructor (canvas, canvastype) {
         super()

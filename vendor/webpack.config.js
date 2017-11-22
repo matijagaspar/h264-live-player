@@ -1,16 +1,17 @@
 const path = require('path')
 const UglifyJsPlugin = require('uglifyjs-webpack-plugin')
-const libraryName = 'WSAvcPlayer'
-module.exports = {
-    entry: path.resolve(__dirname, 'src/index.js'),
+const webpackConfig = {
+    entry: {
+        WSAvcPlayer: path.resolve(__dirname, 'src/index.js'),
+    },
     output: {
         // options related to how webpack emits results
 
         path: path.resolve(__dirname, 'lib'), // string
         // the target directory for all output files
         // must be an absolute path (use the Node.js path module)
-        filename: `${ libraryName }.js`,
-        library: libraryName,
+        filename: `[name].js`,
+        library: '[name]',
         libraryTarget: 'umd',
         umdNamedDefine: true,
     },
@@ -42,8 +43,10 @@ module.exports = {
     node: {
         fs: 'empty',
     },
-    plugins: [
-        new UglifyJsPlugin(),
-    ],
+    plugins: [],
 
 }
+if (process.env.NODE_ENV === 'production')
+    webpackConfig.plugins.push(new UglifyJsPlugin())
+
+module.exports = webpackConfig

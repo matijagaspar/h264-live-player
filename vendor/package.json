@@ -2,8 +2,12 @@
   "name": "ws-avc-player",
   "version": "0.1.0",
   "main": "lib/WSAvcPlayer.js",
+  "files":[
+    "lib/"
+  ],
   "scripts": {
-    "dist": "webpack",
+    "dist": "cross-env NODE_ENV=production webpack",
+    "dev": "webpack",
     "lint": "eslint .",
     "lint-fix": "eslint . --fix",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -37,6 +41,7 @@
     "babel-loader": "^7.1.2",
     "babel-preset-env": "^1.6.1",
     "babel-preset-stage-1": "^6.24.1",
+    "cross-env": "^5.1.1",
     "eslint": "^4.11.0",
     "eslint-import-resolver-webpack": "^0.8.3",
     "uglifyjs-webpack-plugin": "^1.1.0",

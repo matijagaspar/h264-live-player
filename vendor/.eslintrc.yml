@@ -69,3 +69,4 @@ rules:
     strict: 0
     template-curly-spacing: [ 1, "always" ]
     template-tag-spacing: [ 1, "never" ]
+    no-console: 1
